@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "payload_id": "ayran-release-0.1.5",
+  "payload_id": "ayran-release-0.1.6",
   "milestone": "M9",
   "runtime_implemented": true,
   "files": [
@@ -22,6 +22,7 @@
     "docs/logo.png",
     "docs/operations/README.md",
     "docs/operations/install.md",
+    "docs/operations/session.md",
     "docs/operations/scope.md",
     "docs/operations/security.md",
     "docs/operations/troubleshooting.md",

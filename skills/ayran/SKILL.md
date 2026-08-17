@@ -19,8 +19,9 @@ or permissions.
 
 Ayran is a workflow, evidence, and graph layer over Prime:
 
-- The **Target Graph** holds this engagement's maps, hypotheses, evidence,
-  coverage, and dead ends.
+- The **Target Graph** holds this folder's maps, hypotheses, evidence,
+  coverage, and dead ends. It survives `/quit` and a new `--ayran` chat in
+  the same project. Do not treat a blank Prime session as a blank audit.
 - The M2 sidecar exposes that graph over a local Unix-domain JSON-RPC
   socket. The TypeScript extension injects a bounded **context pack** and
   enforces run-binding on tool calls. It does **not** sandbox the kernel.

@@ -89,3 +89,14 @@ for the rest of the session. `prime-agent --ayran` still starts the sidecar
 Until activate, greetings must not receive an `audit-turn` pack. If the
 sidecar is unreachable *and* injection is on, the empty-context note and
 fail-closed policy behavior in decision 5 still apply.
+
+## Amendment (2026-08-17, Target Graph pin)
+
+One protocol folder has one Target Graph. `ayran start` / `prime-agent
+--ayran` reattaches `.ayran/engagement.json` when `stream.json` and
+`graph/` still exist. Reattach refreshes the sidecar token; it does not
+wipe maps or hypotheses. Journals stay on ext4 (`<cwd>/.ayran/state` when
+the clone is ext4, otherwise `~/.local/state/ayran/runs/<run_id>`).
+`--fresh` / `AYRAN_FRESH=1` mints a new empty run and overwrites the pin.
+A missing journal behind a stale pin also mints a new run. This is not
+the Global or Learning Graph.

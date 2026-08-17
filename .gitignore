@@ -39,6 +39,10 @@ __pycache__/
 *.tsbuildinfo
 .npm/
 
+# Per-project Target Graph pin and journals (audit clones should ignore these too)
+.ayran/state/
+.ayran/engagement.json
+
 # Runtime state, journals, sockets, databases, and secrets never belong here
 *.sqlite
 *.sqlite3

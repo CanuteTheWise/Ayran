@@ -10,7 +10,7 @@ Ayran installs from Windows-built archives into a selected WSL ext4 prefix. Acti
 
 Neither mode copies, upgrades, or removes Foundry, Slither, solc, or other WSL tools. Adapters detect them.
 
-After Layer/Complete install, attach the package with `prime-agent package install <ayran-pkg> --local` in the audit workspace. Start a session with `prime-agent --ayran`. Bind scope and arm injection as in [scope.md](scope.md).
+After Layer/Complete install, attach the package with `prime-agent package install <ayran-pkg> --local` in the audit workspace. Start a session with `prime-agent --ayran`. The Target Graph is pinned to that folder ([session.md](session.md)). Bind scope and arm injection as in [scope.md](scope.md).
 
 ## WSL selection
 
@@ -28,7 +28,7 @@ install-ayran.sh --complete --prefix ~/.local/ayran
 install-ayran.sh --layer --prime /path/to/prime --dry-run
 ayran release install --layer --prime <path> --prefix <prefix>
 ayran release install --complete --prefix <prefix>
-ayran release validate --path dist/ayran-layer-0.1.5.tar.gz
+ayran release validate --path dist/ayran-layer-0.1.6.tar.gz
 ```
 
 `--dry-run` prints the exact plan (created paths, Prime classification, no Windows writes outside `dist`/explicit reports) and makes no changes.

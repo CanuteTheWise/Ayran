@@ -6,7 +6,16 @@
 
 Ayran is a private, local-first autonomous smart-contract security audit harness. It wraps the Prime-Agent CLI with a structured evidence pipeline that turns a configured AI model into a disciplined auditor — one that maps attack surfaces, proposes hypotheses, executes tools to prove or disprove them, enforces validation gates, retains what it learns between audits, and produces defensible reports where every claim resolves to recorded evidence.
 
-The current release is **0.1.5**. It covers milestones M0 through M9 plus a one-command `--ayran` session (auto-bound scope, injection after `/ayran:activate`). It targets Solidity/EVM contracts on WSL2, runs entirely offline, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
+The current release is **0.1.6**. It covers milestones M0 through M9 plus a one-command `--ayran` session (auto-bound scope, **project-pinned Target Graph**, injection after `/ayran:activate`). It targets Solidity/EVM contracts on WSL2, runs entirely offline, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
+
+### How to understand Ayran
+
+This README is the current product description. Use it first.
+
+- **Run it:** [docs/operations](docs/operations/README.md) — install, [sessions / Target Graph](docs/operations/session.md), scope, upgrade, security, troubleshooting.
+- **Why a decision looks like this:** [docs/adrs](docs/adrs) — accepted architecture records (journal, sidecar, Prime bridge, adapters, gates, corpus, learning, release).
+- **Lead AI contract (local only):** `LEAD-OPERATIONS-MANUAL.md` is gitignored. It tells the engagement-lead model how to direct the executing model inside Prime. It is not on GitHub.
+- **Do not start from the 2026-08-12 engineering blueprint.** That freeze (`docs/ayran-final-engineering-blueprint.md`) is local, gitignored, and predates `--ayran`, auto-scope, `/ayran:activate`, and per-folder Target Graph persistence. Rewriting it would fork the truth. Current behavior lives here and in operations/ADRs.
 
 ---
 
@@ -20,7 +29,7 @@ Using a plain AI agent for smart-contract auditing creates several structural pr
 
 **Anchoring on known patterns.** Agents tend to find the bugs they've seen before, missing novel attack paths. Ayran protects against this with a mandatory target-first discovery phase, blind-vs-aware review separation, and six independently budgeted hypothesis drivers that prevent any single approach from monopolizing the search.
 
-**No organizational memory.** Each audit starts from zero. Ayran's three-namespace graph separates engagement-specific state (Target Graph) from curated methodology knowledge (Global Graph) from lessons learned across engagements (Learning Graph). Learning promotions are human-reviewed, contamination-checked, and atomically reversible.
+**No organizational memory across protocols.** Ayran's three-namespace graph separates engagement-specific state (Target Graph, pinned to one protocol folder so mapping survives `/quit` and a new `--ayran` chat) from curated methodology knowledge (Global Graph) from lessons learned across engagements (Learning Graph). Learning promotions are human-reviewed, contamination-checked, and atomically reversible.
 
 **Unsafe tool execution.** Agents that shell out to tools without policy gates can execute unintended actions. Ayran invokes every tool through typed adapters with argv-only invocation, environment variable allowlisting, resource limits, and deny-wins scope policies. Destructive actions always require explicit human approval.
 
@@ -34,7 +43,7 @@ Ayran is a package that layers onto a stock Prime-Agent installation without mod
 
 **2. Sidecar engine (Python)** — the brain. A per-run Unix-domain-socket JSON-RPC server that owns the journal, database projections, policy engine, tool adapters, context compiler, event router, evidence pipeline, knowledge corpus, and promotion pipeline. Only the sidecar writes to canonical state; the extension is a client.
 
-**3. Graph Fabric** — the memory. Three isolated namespaces sharing one journal format: Target (per-audit), Global (curated methodology knowledge, immutable releases), and Learning (quarantined cross-engagement lessons, human-reviewed promotion). All authoritative state lives on WSL2 ext4.
+**3. Graph Fabric** — the memory. Three isolated namespaces sharing one journal format: Target (one protocol folder, durable across Prime sessions), Global (curated methodology knowledge, immutable releases), and Learning (quarantined cross-engagement lessons, human-reviewed promotion). Journals live on WSL2 ext4.
 
 ---
 
@@ -42,9 +51,9 @@ Ayran is a package that layers onto a stock Prime-Agent installation without mod
 
 Every audit engages the same pipeline. Here is the flow from start to finish:
 
-### 1. Setup: `/ayran-start`
+### 1. Setup: `prime-agent --ayran`
 
-You provide a scope manifest identifying the target repository, the audit focus areas, permitted actions, and forbidden targets. The sidecar reads the manifest, computes the engagement identity, opens a journal, and loads the Global Graph's current corpus release. The Prime extension registers the run.
+In the protocol folder, start Prime with `--ayran`. That starts the sidecar and **reattaches** this folder's Target Graph (or creates one on first visit). Scope auto-binds from `src` / `contracts` / nearby Solidity. Chat stays normal until `/ayran:activate`. `/quit` stops the sidecar; the graph remains. The next `--ayran` in the same folder continues the audit. `AYRAN_FRESH=1` starts empty. Details: [sessions](docs/operations/session.md).
 
 ### 2. Mapping: build the model of the target
 
@@ -243,7 +252,7 @@ source "$HOME/.local/ayran-venv/bin/activate"
 prime-agent --ayran
 ```
 
-That one command starts the sidecar and **auto-binds scope** from the repo layout (`src`, `contracts`, or `.`). You do not write a scope JSON. The model does not write it either — expanding its own permissions would be a jailbreak. Chat stays normal until `/ayran:activate`. Plain `prime-agent` does not start Ayran.
+That one command starts the sidecar, **auto-binds scope** from the repo layout (`src`, `contracts`, or `.`), and **reattaches this folder's Target Graph** (or creates one). You do not write a scope JSON. The model does not write it either — expanding its own permissions would be a jailbreak. Chat stays normal until `/ayran:activate`. Plain `prime-agent` does not start Ayran. Coming back tomorrow in the same folder continues the same map.
 
 Optional overrides: `--ayran-manifest path.json`, `AYRAN_SCOPE`, or `.ayran/scope.json`.
 
@@ -275,7 +284,8 @@ Rollback and uninstall remove ONLY what Ayran installed. Your existing Prime, Fo
 
 ```text
 # Audit lifecycle
-ayran start                             # auto-detect in-scope folders and bind
+ayran start                             # reattach this folder's Target Graph, or create one
+ayran start --fresh                     # new empty Target Graph for this folder
 ayran start --roots src,contracts       # override detected folders
 ayran start --manifest <scope>          # bind a custom scope-manifest JSON
 ayran session prepare [--cwd <path>]    # same auto-bind as start, for --ayran
@@ -460,6 +470,7 @@ The extension's `ipython` tool-blocking is best-effort and is NOT a security bou
 ### Operations
 
 - [Install guide](docs/operations/install.md)
+- [Sessions and the Target Graph](docs/operations/session.md)
 - [Scope](docs/operations/scope.md)
 - [Security model](docs/operations/security.md)
 - [Troubleshooting](docs/operations/troubleshooting.md)
@@ -470,6 +481,6 @@ The extension's `ipython` tool-blocking is best-effort and is NOT a security bou
 
 ## License and distribution
 
-Ayran 0.1.5 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
+Ayran 0.1.6 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
 
-This is version 0.1.5. It is not a certified release. Live-model A0–A7 evaluation with real model provider API calls has not been executed. The `createAgentSession` SDK interface requires a live Prime runtime for full validation.
+This is version 0.1.6. It is not a certified release. Live-model A0–A7 evaluation with real model provider API calls has not been executed. The `createAgentSession` SDK interface requires a live Prime runtime for full validation.

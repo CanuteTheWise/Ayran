@@ -25,7 +25,7 @@ M9 is the private-release gate. M0–M8 delivered contracts, journal, sidecar, P
    Layer attaches to an externally owned compatible Prime and never writes or removes it. Complete vendors unmodified Prime 0.7.2 under an Ayran-owned versioned prefix. Receipts list only created paths. Rollback restores the prior pointer. Uninstall removes receipt-listed paths only. External tools stay detect-only.
 
 5. **Operations docs are operator artifacts.**
-   Install, upgrade, security, troubleshooting, and evaluation documents live under `docs/operations/` and describe doctor output, receipts, and the A0–A7 gate without introducing a second UI.
+   Install, sessions/Target Graph pin, upgrade, security, troubleshooting, and evaluation documents live under `docs/operations/` and describe doctor output, receipts, and the A0–A7 gate without introducing a second UI.
 
 ## Consequences
 

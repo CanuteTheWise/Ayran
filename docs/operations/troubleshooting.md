@@ -11,14 +11,30 @@ Interpret `doctor_status`:
 
 ## First session (`prime-agent --ayran`)
 
-`--ayran` starts the sidecar and auto-binds scope from the workspace layout
-(`src` / `contracts` / nearby `.sol` / `.`). It does not inject audit context
+`--ayran` starts the sidecar, **reattaches this folder's Target Graph** (or
+creates one), and auto-binds scope from the workspace layout (`src` /
+`contracts` / nearby `.sol` / `.`). It does not inject audit context
 packs until `/ayran:activate`. Override with `--ayran-manifest`, `AYRAN_SCOPE`,
-or `.ayran/scope.json`.
+or `.ayran/scope.json`. `AYRAN_FRESH=1` starts an empty graph.
 
 `no scope manifest is loaded; fail closed` should not happen on a current
 `--ayran` session. If it does, the Layer prefix is stale — refresh from the
 Ayran tree. See [scope.md](scope.md).
+
+## Graph did not survive `/quit`
+
+Same folder, new `prime-agent --ayran`, should keep the same `run_id` in
+`.ayran/engagement.json`. Mapping lives in that run, not in the Prime chat.
+
+If it looks empty:
+
+- `/ayran:activate` was not run in **this** Prime session (packs off; the
+  graph is still on disk).
+- `AYRAN_FRESH=1` or `ayran start --fresh` minted a new empty graph.
+- The pin exists but `stream.json` is gone — Ayran treats that as stale and
+  starts a new run.
+- The clone is on DrvFS: journals are under `~/.local/state/ayran/runs/<id>`.
+  Wiping WSL home loses them even if `.ayran/engagement.json` remains.
 
 ## Common error codes
 

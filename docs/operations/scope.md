@@ -5,6 +5,16 @@ A scope manifest is **sidecar policy**, not the target protocol.
 `--ayran` **auto-binds** it from the workspace layout. You do not fill JSON.
 The **model does not author scope**.
 
+The **Target Graph** is also pinned to this folder. See [session.md](session.md).
+`.ayran/engagement.json` points at the durable run. A new blank
+`prime-agent --ayran` in the same project **reopens that graph**. Journals
+stay on ext4: `<cwd>/.ayran/state` when the project is ext4, otherwise
+`~/.local/state/ayran/runs/<run_id>` with only the pin in the project
+(DrvFS clones). Gitignore `.ayran/state/` and usually `engagement.json` in
+the protocol repo.
+
+Clean slate: `ayran start --fresh` or `AYRAN_FRESH=1`.
+
 ## One command
 
 ```text

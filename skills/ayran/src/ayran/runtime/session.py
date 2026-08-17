@@ -1,4 +1,4 @@
-"""Prepare a per-session Target run so ``ayran service`` can bind."""
+"""Prepare or reattach a per-project Target run so ``ayran service`` can bind."""
 
 from __future__ import annotations
 
@@ -17,20 +17,60 @@ from ayran.graph.errors import CONTRACT_INVALID, GraphError
 from ayran.graph.ids import new_id
 from ayran.graph.namespaces import require_ext4, target_stream
 from ayran.graph.recovery import GraphStore
-from ayran.policy.scope import ScopeManifest
+from ayran.policy.scope import ScopeManifest, load_scope
+from ayran.runtime.engagement import (
+    existing_run_root,
+    load_pin,
+    resolve_state_root,
+    write_pin,
+)
 from ayran.runtime.paths import default_state_root, run_root, runtime_root, socket_path
+
+
+def _session_paths(*, cwd: Path, state_root: Path, run_id: str) -> dict[str, Any]:
+    resolved_cwd = cwd.expanduser().resolve(strict=False)
+    resolved_state = state_root.expanduser().resolve(strict=False)
+    base = run_root(resolved_state, run_id)
+    runtime = runtime_root(resolved_state, run_id)
+    runtime.mkdir(parents=True, exist_ok=True)
+    token = create_token(runtime, run_id=run_id)
+    sock = socket_path(resolved_state, run_id)
+    return {
+        "schema_version": "1.0.0",
+        "run_id": run_id,
+        "state_root": str(resolved_state),
+        "run_root": str(base),
+        "socket": str(sock),
+        "token_file": str(token),
+        "cwd": str(resolved_cwd),
+        "created_at": utc_now(),
+        "pin_file": str(
+            write_pin(
+                resolved_cwd,
+                run_id=run_id,
+                state_root=resolved_state,
+                run_root_path=base,
+            )
+        ),
+    }
 
 
 def prepare_session(
     *,
     cwd: Path,
     state_root: Path | None = None,
+    fallback_state: Path | None = None,
     allow_unsafe_filesystem: bool = False,
 ) -> dict[str, Any]:
-    """Create stream, empty graph, token, and socket path for one Prime session."""
+    """Create stream, empty graph, token, and socket path for one Target run."""
 
     resolved_cwd = cwd.expanduser().resolve(strict=False)
-    resolved_state = (state_root or default_state_root()).expanduser().resolve(strict=False)
+    resolved_state = resolve_state_root(
+        resolved_cwd,
+        explicit=state_root,
+        fallback=fallback_state or default_state_root(),
+        allow_unsafe_filesystem=allow_unsafe_filesystem,
+    )
     require_ext4(resolved_state, allow_unsafe_filesystem=allow_unsafe_filesystem)
     run_id = new_id("run")
     identity = {
@@ -49,20 +89,36 @@ def prepare_session(
     graph_root = base / "graph"
     store = GraphStore(graph_root, stream, allow_unsafe_filesystem=allow_unsafe_filesystem)
     store.close()
-    runtime = runtime_root(resolved_state, run_id)
-    runtime.mkdir(parents=True, exist_ok=True)
-    token = create_token(runtime, run_id=run_id)
-    sock = socket_path(resolved_state, run_id)
-    return {
-        "schema_version": "1.0.0",
-        "run_id": run_id,
-        "state_root": str(resolved_state),
-        "run_root": str(base),
-        "socket": str(sock),
-        "token_file": str(token),
-        "cwd": str(resolved_cwd),
-        "created_at": utc_now(),
-    }
+    prepared = _session_paths(cwd=resolved_cwd, state_root=resolved_state, run_id=run_id)
+    prepared["resumed"] = False
+    return prepared
+
+
+def reattach_session(
+    *,
+    cwd: Path,
+    allow_unsafe_filesystem: bool = False,
+) -> dict[str, Any] | None:
+    """Reopen the project-pinned Target run if the journal is still on disk."""
+
+    pin = load_pin(cwd)
+    if pin is None:
+        return None
+    base = existing_run_root(pin)
+    if base is None:
+        return None
+    resolved_state = Path(str(pin["state_root"]))
+    require_ext4(resolved_state, allow_unsafe_filesystem=allow_unsafe_filesystem)
+    prepared = _session_paths(cwd=cwd, state_root=resolved_state, run_id=str(pin["run_id"]))
+    prepared["resumed"] = True
+    scope_file = base / "scope.json"
+    if scope_file.is_file():
+        loaded = load_scope(scope_file)
+        prepared["scope_id"] = loaded.scope_id
+        prepared["scope_hash"] = loaded.hash
+        prepared["scope_file"] = str(scope_file)
+        prepared["included_roots"] = [item or "." for item in loaded.included_roots]
+    return prepared
 
 
 def bind_scope_value(payload: dict[str, Any], *, run_id: str, dest_root: Path) -> ScopeManifest:
@@ -98,18 +154,47 @@ def start_engagement(
     manifest: Path | None = None,
     roots: list[str] | None = None,
     state_root: Path | None = None,
+    fallback_state: Path | None = None,
     allow_unsafe_filesystem: bool = False,
+    fresh: bool = False,
 ) -> dict[str, Any]:
-    """Prepare a session and bind a scope file or generated local-roots envelope."""
+    """Reattach the project-pinned Target Graph, or create one and bind scope."""
 
     if manifest is not None and roots:
         raise GraphError(
             CONTRACT_INVALID,
             "start accepts only one of --manifest or --roots.",
         )
+    if not fresh:
+        resumed = reattach_session(cwd=cwd, allow_unsafe_filesystem=allow_unsafe_filesystem)
+        if resumed is not None:
+            dest = Path(resumed["run_root"])
+            run_id = str(resumed["run_id"])
+            if manifest is not None or roots:
+                if manifest is not None:
+                    bound = bind_scope_to_run(
+                        manifest.expanduser(),
+                        run_id=run_id,
+                        dest_root=dest,
+                    )
+                else:
+                    from ayran.policy.local_scope import detect_local_roots, local_scope_manifest
+
+                    chosen = list(roots) if roots else detect_local_roots(cwd)
+                    bound = bind_scope_value(
+                        local_scope_manifest(chosen, run_id=run_id, cwd=cwd),
+                        run_id=run_id,
+                        dest_root=dest,
+                    )
+                resumed["scope_id"] = bound.scope_id
+                resumed["scope_hash"] = bound.hash
+                resumed["scope_file"] = str(dest / "scope.json")
+                resumed["included_roots"] = [item or "." for item in bound.included_roots]
+            return resumed
     prepared = prepare_session(
         cwd=cwd,
         state_root=state_root,
+        fallback_state=fallback_state,
         allow_unsafe_filesystem=allow_unsafe_filesystem,
     )
     dest = Path(prepared["run_root"])

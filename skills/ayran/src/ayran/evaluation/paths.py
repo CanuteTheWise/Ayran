@@ -6,7 +6,7 @@ from pathlib import Path
 
 PINNED_TIME = "2026-08-15T00:00:00Z"
 PARSER_VERSION = "1.0.0"
-RELEASE_VERSION = "0.1.5"
+RELEASE_VERSION = "0.1.6"
 FIXED_SEEDS = (7, 13, 21)
 RUBRIC_VERSION = "ayran-eval-rubric-v1"
 

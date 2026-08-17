@@ -112,6 +112,9 @@ export async function ensureSidecar(
   if (manifest.length > 0) {
     prepareArgs.push("--manifest", manifest);
   }
+  if (process.env.AYRAN_FRESH === "1") {
+    prepareArgs.push("--fresh");
+  }
   const prepared = spawnSync(python, prepareArgs, {
     encoding: "utf8",
     timeout: 30_000,

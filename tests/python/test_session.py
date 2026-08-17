@@ -1,4 +1,4 @@
-"""Session prepare creates an empty Target run for Prime --ayran."""
+"""Session prepare creates or reattaches the project-pinned Target run."""
 
 from __future__ import annotations
 
@@ -188,3 +188,55 @@ def test_start_messy_repo_excludes_out(tmp_path: Path, short_state_root: Path) -
     loaded = load_scope(Path(started["scope_file"]))
     assert loaded.included_roots == ["src"]
     assert "out" in loaded.excluded_roots
+
+
+def test_start_reattaches_the_same_project_run(tmp_path: Path, short_state_root: Path) -> None:
+    cwd = tmp_path / "protocol"
+    cwd.mkdir()
+    first = start_engagement(
+        cwd=cwd,
+        state_root=short_state_root,
+        allow_unsafe_filesystem=True,
+    )
+    marker = Path(first["run_root"]) / "graph" / "keep-me.txt"
+    marker.write_text("maps live here", encoding="utf-8")
+    pin = Path(first["pin_file"])
+    assert pin.is_file()
+    second = start_engagement(
+        cwd=cwd,
+        state_root=short_state_root,
+        allow_unsafe_filesystem=True,
+    )
+    assert second["resumed"] is True
+    assert second["run_id"] == first["run_id"]
+    assert marker.read_text(encoding="utf-8") == "maps live here"
+    fresh = start_engagement(
+        cwd=cwd,
+        state_root=short_state_root,
+        allow_unsafe_filesystem=True,
+        fresh=True,
+    )
+    assert fresh["resumed"] is False
+    assert fresh["run_id"] != first["run_id"]
+
+
+def test_stale_pin_mints_a_new_run(tmp_path: Path, short_state_root: Path) -> None:
+    import json
+
+    cwd = tmp_path / "protocol"
+    cwd.mkdir()
+    first = start_engagement(
+        cwd=cwd,
+        state_root=short_state_root,
+        allow_unsafe_filesystem=True,
+    )
+    (Path(first["run_root"]) / "stream.json").unlink()
+    second = start_engagement(
+        cwd=cwd,
+        state_root=short_state_root,
+        allow_unsafe_filesystem=True,
+    )
+    assert second["resumed"] is False
+    assert second["run_id"] != first["run_id"]
+    pin = json.loads(Path(second["pin_file"]).read_text(encoding="utf-8"))
+    assert pin["run_id"] == second["run_id"]
