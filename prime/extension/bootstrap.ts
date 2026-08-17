@@ -45,6 +45,8 @@ export interface RuntimeState {
   lastSessionReason: string | undefined;
   closed: boolean;
   sessionActive: boolean;
+  injectionActive: boolean;
+  scopeManifestPath: string;
   sidecarProcess: ChildProcess | undefined;
   spawnedSidecar: boolean;
   autoStartSidecar: boolean;
@@ -143,6 +145,8 @@ export function createRuntime(cwd: string): RuntimeState {
     lastSessionReason: undefined,
     closed: false,
     sessionActive: Boolean(settings.sidecarSocketPath),
+    injectionActive: false,
+    scopeManifestPath: "",
     sidecarProcess: undefined,
     spawnedSidecar: false,
     autoStartSidecar: true,

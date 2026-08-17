@@ -80,3 +80,12 @@ itself, and must never present Python-cell filtering as OS sandboxing.
   `createAgentSession` SDK runs remain blocked on M9 URL-closure.
 * M4+ adapters and M5 driver bodies are out of scope; specialist skills are
   spawn shells only.
+
+## Amendment (2026-08-17)
+
+Context-pack injection on `before_agent_start` is gated by `/ayran:activate`
+for the rest of the session. `prime-agent --ayran` still starts the sidecar
+(and may bind a scope via `--ayran-manifest` / `ayran start --manifest`).
+Until activate, greetings must not receive an `audit-turn` pack. If the
+sidecar is unreachable *and* injection is on, the empty-context note and
+fail-closed policy behavior in decision 5 still apply.

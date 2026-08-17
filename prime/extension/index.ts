@@ -26,6 +26,10 @@ export function activate(
         type: "boolean",
         default: false,
       });
+      pi.registerFlag("ayran-manifest", {
+        description: "Scope manifest to bind when starting the Ayran sidecar",
+        type: "string",
+      });
     }
     if (typeof pi.getFlag === "function" && pi.getFlag("ayran")) {
       runtime.sessionActive = true;

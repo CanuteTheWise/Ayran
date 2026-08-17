@@ -15,7 +15,7 @@ from ayran.bridge.lifecycle import record_child, record_session_event
 from ayran.compatibility.locks import check_compatibility
 from ayran.config.models import EffectiveConfig
 from ayran.graph.canonical import canonical_hash
-from ayran.graph.errors import GraphError
+from ayran.graph.errors import CONTRACT_INVALID, GraphError
 from ayran.graph.recovery import GraphStore
 from ayran.policy.permissions import PolicyEngine
 from ayran.policy.scope import ScopeManifest, load_scope
@@ -75,6 +75,7 @@ class BridgeDispatcher:
     scope: ScopeManifest | None
     policy: PolicyEngine
     state_root: Path
+    run_root: Path
     shutdown_callback: Callable[[], None] | None = None
     last_pack_hashes: dict[str, str] = field(default_factory=dict)
     children: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -89,6 +90,7 @@ class BridgeDispatcher:
             "run.recover": self.recover,
             "run.checkpoint": self.checkpoint,
             "run.shutdown": self.shutdown,
+            "scope.load": self.scope_load,
             "context.pack": self.context_pack,
             "policy.authorize": self.authorize,
             "lifecycle.record": self.lifecycle_record,
@@ -239,6 +241,27 @@ class BridgeDispatcher:
             "checkpoint_id": checkpoint.get("checkpoint_id"),
             "graph_cursor": checkpoint.get("journal_cursor"),
             "learning_capture": captured,
+        }
+
+    def scope_load(self, params: dict[str, Any]) -> dict[str, Any]:
+        from ayran.runtime.session import bind_scope_to_run
+
+        raw = str(params.get("manifest") or "").strip()
+        if not raw:
+            raise GraphError(CONTRACT_INVALID, "scope.load requires a manifest path.")
+        source = Path(raw).expanduser()
+        if not source.is_file():
+            raise GraphError(CONTRACT_INVALID, f"scope manifest is not a file: {source}")
+        manifest = bind_scope_to_run(source, run_id=self.run_id, dest_root=self.run_root)
+        self.scope = manifest
+        self.policy = PolicyEngine(manifest, config=self.config)
+        return {
+            "schema_version": "1.0.0",
+            "run_id": self.run_id,
+            "scope_id": manifest.scope_id,
+            "scope_hash": manifest.hash,
+            "scope_file": str(self.run_root / "scope.json"),
+            "policy_loaded": True,
         }
 
     def context_pack(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -1138,5 +1161,6 @@ def build_dispatcher(
         scope=scope,
         policy=policy,
         state_root=state_root,
+        run_root=run_root,
         shutdown_callback=shutdown_callback,
     )

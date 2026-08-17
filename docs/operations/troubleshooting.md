@@ -9,6 +9,19 @@ Interpret `doctor_status`:
 - `healthy` — all checks passed.
 - `failed` — read `checks` for the first failed invariant. Do not start a run.
 
+## First session (`prime-agent --ayran`)
+
+`--ayran` starts the sidecar. It does not inject audit context packs until
+`/ayran:activate`. Bind a signed scope with `--ayran-manifest`, `AYRAN_SCOPE`,
+`.ayran/scope.json`, `ayran start --manifest`, or `/ayran:activate <path>`.
+
+`no scope manifest is loaded; fail closed` means the run has no `scope.json`,
+not that the sidecar is down. If `run.ping` succeeds, load a manifest.
+
+If the model deep-thinks on a greeting, injection is still on for that
+session (restart Prime after upgrading, then activate only when you want
+audit packs). See [scope.md](scope.md).
+
 ## Common error codes
 
 | Code | Meaning | Operator action |

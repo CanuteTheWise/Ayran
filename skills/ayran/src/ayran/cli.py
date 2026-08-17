@@ -1,10 +1,10 @@
-"""Ayran operator CLI: doctor/status/diagnose/stop/recover/service.
+"""Ayran operator CLI: doctor/status/diagnose/stop/recover/service/start.
 
-These commands are deterministic and bound to one run.  ``doctor`` checks the
-compatibility and resource facts; ``status`` reconstructs run state; ``diagnose``
-exports a redacted support bundle; ``stop`` applies the process-tree
-termination; ``recover`` replays graph state and reconciles process metadata;
-``service`` starts the local JSON-RPC boundary.
+These commands are deterministic and bound to one run.  ``start`` prepares a
+session and binds a signed scope manifest; ``doctor`` checks compatibility
+and resource facts; ``status`` reconstructs run state; ``diagnose`` exports a
+redacted support bundle; ``stop`` applies process-tree termination;
+``recover`` replays graph state; ``service`` starts the local JSON-RPC boundary.
 """
 
 from __future__ import annotations
@@ -86,6 +86,15 @@ def _parser() -> argparse.ArgumentParser:
     service.add_argument("--socket", type=Path, default=None)
     service.add_argument("--token-file", type=Path, default=None)
 
+    start = sub.add_parser("start", help="prepare a run and bind a signed scope manifest")
+    _add_config(start)
+    start.add_argument("--manifest", type=Path, required=True, help="path to the scope manifest JSON")
+    start.add_argument("--cwd", type=Path, default=None)
+    start.add_argument("--state-root", type=Path, default=None)
+    start.add_argument(
+        "--allow-unsafe-filesystem", action="store_true", help=argparse.SUPPRESS
+    )
+
     session = sub.add_parser("session", help="prepare a Prime-session sidecar run")
     session_sub = session.add_subparsers(dest="session_command", required=True)
     session_prepare = session_sub.add_parser(
@@ -94,6 +103,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_config(session_prepare)
     session_prepare.add_argument("--cwd", type=Path, default=None)
     session_prepare.add_argument("--state-root", type=Path, default=None)
+    session_prepare.add_argument("--manifest", type=Path, default=None)
     session_prepare.add_argument(
         "--allow-unsafe-filesystem", action="store_true", help=argparse.SUPPRESS
     )
@@ -413,14 +423,32 @@ def _command_service(config, run: str, state_root: Path | None, socket: Path | N
 
 
 def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
-    from ayran.runtime.session import prepare_session
+    from ayran.runtime.session import prepare_session, start_engagement
 
     if arguments.session_command != "prepare":
         raise ValueError(f"unsupported session command: {arguments.session_command}")
     cwd = Path(arguments.cwd) if arguments.cwd else Path.cwd()
     state = Path(arguments.state_root) if arguments.state_root else Path(config.state_root)
-    return prepare_session(
+    unsafe = bool(getattr(arguments, "allow_unsafe_filesystem", False))
+    manifest = getattr(arguments, "manifest", None)
+    if manifest is not None:
+        return start_engagement(
+            cwd=cwd,
+            manifest=Path(manifest),
+            state_root=state,
+            allow_unsafe_filesystem=unsafe,
+        )
+    return prepare_session(cwd=cwd, state_root=state, allow_unsafe_filesystem=unsafe)
+
+
+def _command_start(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    from ayran.runtime.session import start_engagement
+
+    cwd = Path(arguments.cwd) if arguments.cwd else Path.cwd()
+    state = Path(arguments.state_root) if arguments.state_root else Path(config.state_root)
+    return start_engagement(
         cwd=cwd,
+        manifest=Path(arguments.manifest),
         state_root=state,
         allow_unsafe_filesystem=bool(getattr(arguments, "allow_unsafe_filesystem", False)),
     )
@@ -903,6 +931,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _command_recover(config, arguments.run, state_root)
         elif arguments.command == "service":
             result = _command_service(config, arguments.run, state_root, arguments.socket, arguments.token_file)
+        elif arguments.command == "start":
+            result = _command_start(config, arguments)
         elif arguments.command == "session":
             result = _command_session(config, arguments)
         elif arguments.command == "tools":

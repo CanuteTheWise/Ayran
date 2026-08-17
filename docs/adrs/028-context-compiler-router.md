@@ -94,9 +94,10 @@ from the blueprint must live in `examined_result` without new schemas.
 9. **Sidecar RPC and extension.** New methods:
    `context.compile` (and `context.pack` as alias), `ontology.query`,
    `router.{status,step,history}`, `coverage.{summary,cell}`,
-   `maps.{get,build}`. The M3 `before_agent_start` hook calls
-   `context.compile` and prefers `injection_text`. The extension still
-   does not write the journal.
+   `maps.{get,build}`. After `/ayran:activate`, the M3 `before_agent_start`
+   hook calls `context.compile` and prefers `injection_text`. Until
+   activate, that hook does not inject. The extension still does not write
+   the journal.
 
 10. **Learning Graph is a stub.** `get_promoted_lessons` returns `[]`.
     `get_routing_policy` returns `{policy: "m8-stub"}`.

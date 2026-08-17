@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "./prime-api.ts";
 import type { RuntimeState } from "./bootstrap.ts";
+import { ensureSidecar, resolveScopeManifest } from "./launch.ts";
 
 function formatResult(value: unknown): string {
   return JSON.stringify(value, null, 2);
@@ -19,6 +20,50 @@ export function registerCommands(
   pi: ExtensionAPI,
   runtime: RuntimeState,
 ): void {
+  pi.registerCommand("ayran:activate", {
+    description:
+      "Turn Ayran context-pack injection on for the rest of this session. Optional: /ayran:activate <scope-manifest.json>",
+    handler: async (args, ctx) => {
+      runtime.sessionActive = true;
+      const requested = args.trim();
+      runtime.scopeManifestPath = resolveScopeManifest(
+        ctx.cwd,
+        requested || runtime.scopeManifestPath,
+      );
+      const started = await ensureSidecar(runtime, ctx.cwd);
+      if (!started && !runtime.sidecar.reachable) {
+        notify(ctx, "Ayran sidecar could not be started.", "error");
+        runtime.telemetry.event("error", "ayran.command.activate.sidecar", {
+          outcome: "degraded",
+        });
+        return;
+      }
+      if (runtime.scopeManifestPath) {
+        const loaded = await runtime.sidecar.tryCall("scope.load", {
+          manifest: runtime.scopeManifestPath,
+        });
+        if (loaded === undefined) {
+          notify(
+            ctx,
+            `Sidecar is up but the scope manifest could not be loaded: ${runtime.scopeManifestPath}`,
+            "warning",
+          );
+        }
+      }
+      runtime.injectionActive = true;
+      runtime.telemetry.event("info", "ayran.injection.enabled", {
+        scope_bound: Boolean(runtime.scopeManifestPath),
+      });
+      notify(
+        ctx,
+        runtime.scopeManifestPath
+          ? `Ayran injection is on for this session. Scope: ${runtime.scopeManifestPath}`
+          : "Ayran injection is on for this session. Mapped audit tools stay fail-closed until a scope manifest is loaded.",
+        "info",
+      );
+    },
+  });
+
   pi.registerCommand("ayran:status", {
     description:
       "Show sidecar status: graph health, active runs, and tool availability.",

@@ -241,12 +241,17 @@ After a project-local `prime-agent package install <ayran-pkg> --local`:
 # WSL, venv on PATH:
 source "$HOME/.local/ayran-venv/bin/activate"
 prime-agent --ayran
+# or, bind a signed scope when the sidecar starts:
+prime-agent --ayran --ayran-manifest .ayran/scope.json
 ```
 
-`--ayran` starts the sidecar for this session and shuts it down on `/quit`. Plain `prime-agent` does not start Ayran and does not fail-close tools.
+`--ayran` starts the sidecar for this session and shuts it down on `/quit`. It does **not** inject audit context packs until you turn them on. Plain `prime-agent` does not start Ayran and does not fail-close tools.
 
 ```bash
-# Optional: inspect sidecar health from inside Prime
+# Inside Prime: chat normally, then arm injection for the rest of the session
+/ayran:activate
+# optional: bind/load a scope manifest at the same time
+/ayran:activate .ayran/scope.json
 /ayran:status
 /ayran:doctor
 /ayran:stop
@@ -270,7 +275,7 @@ Rollback and uninstall remove ONLY what Ayran installed. Your existing Prime, Fo
 
 ```text
 # Audit lifecycle
-ayran start --manifest <scope>          # initialize an engagement
+ayran start --manifest <scope>          # prepare a run and bind the signed scope manifest
 ayran session prepare [--cwd <path>]    # create stream/token/socket for prime-agent --ayran
 ayran service --run <id>                # run the local JSON-RPC sidecar
 ayran status --run <id>                 # show run status, phase, budget

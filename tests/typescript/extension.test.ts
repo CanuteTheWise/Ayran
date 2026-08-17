@@ -116,10 +116,40 @@ test("idle session does not inject context or fail-close tools", async () => {
   assert.equal(tools[0], undefined);
 });
 
+test("sidecar-armed session does not inject until /ayran:activate", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
+  activate(pi, root, runtime);
+  assert.equal(runtime.injectionActive, false);
+  const injected = await pi.fire("before_agent_start", { prompt: "Hi" });
+  assert.equal(injected[0], undefined);
+});
+
+test("/ayran:activate turns injection on for the session", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.autoStartSidecar = false;
+  runtime.sidecar.tryCall = async () => ({ ok: true, policy_loaded: true });
+  activate(pi, root, runtime);
+  const command = pi.commands.get("ayran:activate");
+  assert.ok(command);
+  await command.handler("", mockCtx());
+  assert.equal(runtime.sessionActive, true);
+  assert.equal(runtime.injectionActive, true);
+  const results = await pi.fire("before_agent_start", { prompt: "audit" });
+  const injected = results[0] as {
+    message?: { customType?: string };
+  };
+  assert.equal(injected.message?.customType, "ayran.context_pack");
+});
+
 test("armed session without sidecar injects a degraded pack and fail-closes tools", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   activate(pi, root, runtime);
   const results = await pi.fire("before_agent_start", { prompt: "hello" });
@@ -151,6 +181,7 @@ test("degraded sidecar fail-closes mapped tool calls when armed", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   activate(pi, root, runtime);
   const blocked = (await pi.fire("tool_call", {
@@ -164,6 +195,7 @@ test("ipython disallowed payloads are blocked with a not-a-sandbox warning", asy
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async () => ({ permitted: true, routed: false });
   activate(pi, root, runtime);
@@ -179,6 +211,7 @@ test("policy gate rejects denied tools and passes allowed tools", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async (method, params = {}) => {
     if (method !== "policy.authorize") {
@@ -210,6 +243,7 @@ test("session switch fork and compact re-inject without crashing", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   const calls: string[] = [];
   runtime.sidecar.tryCall = async (method) => {
@@ -251,6 +285,7 @@ test("command surface is self-documenting", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
+  runtime.injectionActive = true;
   runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async (method) => ({
     method,
@@ -258,6 +293,7 @@ test("command surface is self-documenting", async () => {
   });
   activate(pi, root, runtime);
   for (const name of [
+    "ayran:activate",
     "ayran:status",
     "ayran:doctor",
     "ayran:stop",

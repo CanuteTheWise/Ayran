@@ -29,9 +29,10 @@ Ayran is a workflow, evidence, and graph layer over Prime:
 
 ## Context pack
 
-Before each agent turn the extension injects a persistent custom message
-(`ayran.context_pack`). It is a size-capped view of the Target Graph, not
-the corpus. Typical sections:
+After the operator runs `/ayran:activate`, the extension injects a persistent
+custom message (`ayran.context_pack`) before each agent turn. Until then the
+sidecar may be running, but greetings are not an audit start. The pack is a
+size-capped view of the Target Graph, not the corpus. Typical sections:
 
 - Scope / policy reminders
 - Active hypothesis

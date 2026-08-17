@@ -10,6 +10,8 @@ Ayran installs from Windows-built archives into a selected WSL ext4 prefix. Acti
 
 Neither mode copies, upgrades, or removes Foundry, Slither, solc, or other WSL tools. Adapters detect them.
 
+After Layer/Complete install, attach the package with `prime-agent package install <ayran-pkg> --local` in the audit workspace. Start a session with `prime-agent --ayran`. Bind scope and arm injection as in [scope.md](scope.md).
+
 ## WSL selection
 
 The installer must see a WSL2 distribution with an ext4 install and state root. The distribution name is chosen at install time. It is not hardcoded.

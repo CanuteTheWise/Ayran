@@ -131,3 +131,13 @@ def test_status_and_doctor_shapes(dispatcher: Any) -> None:
     doctor = dispatcher.doctor()
     assert doctor["sidecar_connectivity"] == "ok"
     assert "journal_integrity" in doctor
+
+
+def test_scope_load_rebinds_policy(dispatcher: Any, tmp_path: Path) -> None:
+    path = tmp_path / "rebind.json"
+    path.write_text(json.dumps(scope_value()), encoding="utf-8")
+    result = dispatcher.scope_load({"manifest": str(path)})
+    assert result["policy_loaded"] is True
+    assert result["run_id"] == RUN_ID
+    assert dispatcher.scope is not None
+    assert dispatcher.scope.run_id == RUN_ID

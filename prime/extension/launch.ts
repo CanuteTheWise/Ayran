@@ -6,7 +6,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { bindSidecar, type RuntimeState } from "./bootstrap.ts";
 
 const PING_ATTEMPTS = 40;
@@ -28,6 +28,27 @@ export function resolveAyranPython(): string {
     return windows;
   }
   return "python3";
+}
+
+export function resolveScopeManifest(cwd: string, explicit?: string): string {
+  const candidates: string[] = [];
+  if (explicit?.trim()) {
+    const value = explicit.trim();
+    candidates.push(value);
+    candidates.push(resolve(cwd, value));
+  }
+  const fromEnv = process.env.AYRAN_SCOPE;
+  if (fromEnv?.trim()) {
+    candidates.push(fromEnv.trim());
+    candidates.push(resolve(cwd, fromEnv.trim()));
+  }
+  candidates.push(join(cwd, ".ayran", "scope.json"));
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
 }
 
 function sleep(ms: number): Promise<void> {
@@ -86,11 +107,15 @@ export async function ensureSidecar(
     }
   }
   const python = resolveAyranPython();
-  const prepared = spawnSync(
-    python,
-    ["-m", "ayran.cli", "session", "prepare", "--cwd", cwd],
-    { encoding: "utf8", timeout: 30_000 },
-  );
+  const manifest = runtime.scopeManifestPath;
+  const prepareArgs =
+    manifest.length > 0
+      ? ["-m", "ayran.cli", "start", "--manifest", manifest, "--cwd", cwd]
+      : ["-m", "ayran.cli", "session", "prepare", "--cwd", cwd];
+  const prepared = spawnSync(python, prepareArgs, {
+    encoding: "utf8",
+    timeout: 30_000,
+  });
   if (prepared.status !== 0) {
     runtime.telemetry.event("error", "ayran.session.prepare_failed", {
       outcome: "degraded",

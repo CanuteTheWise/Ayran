@@ -6,10 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from ayran.api.token import create_token
-from ayran.graph.canonical import canonical_hash, canonical_line, utc_now
+from ayran.graph.canonical import (
+    atomic_write,
+    canonical_hash,
+    canonical_line,
+    strict_json_loads,
+    utc_now,
+)
+from ayran.graph.errors import CONTRACT_INVALID, GraphError
 from ayran.graph.ids import new_id
 from ayran.graph.namespaces import require_ext4, target_stream
 from ayran.graph.recovery import GraphStore
+from ayran.policy.scope import ScopeManifest
 from ayran.runtime.paths import default_state_root, run_root, runtime_root, socket_path
 
 
@@ -55,3 +63,49 @@ def prepare_session(
         "cwd": str(resolved_cwd),
         "created_at": utc_now(),
     }
+
+
+def bind_scope_to_run(source: Path, *, run_id: str, dest_root: Path) -> ScopeManifest:
+    """Validate an operator scope template, pin it to ``run_id``, and write ``scope.json``."""
+
+    payload = strict_json_loads(source.read_bytes())
+    if not isinstance(payload, dict):
+        raise GraphError(CONTRACT_INVALID, "scope manifest file must be a single JSON object.")
+    bound = dict(payload)
+    bound["run_id"] = run_id
+    integrity = dict(bound.get("integrity") or {})
+    integrity["algorithm"] = str(integrity.get("algorithm") or "sha256")
+    integrity["canonicalization"] = str(integrity.get("canonicalization") or "rfc8785")
+    excluded = integrity.get("excluded_fields") or ["integrity.content_hash"]
+    integrity["excluded_fields"] = [str(item) for item in excluded]
+    integrity["content_hash"] = "sha256:" + ("0" * 64)
+    bound["integrity"] = integrity
+    manifest = ScopeManifest(bound)
+    dest_root.mkdir(parents=True, exist_ok=True)
+    atomic_write(dest_root / "scope.json", canonical_line(manifest.value))
+    return manifest
+
+
+def start_engagement(
+    *,
+    cwd: Path,
+    manifest: Path,
+    state_root: Path | None = None,
+    allow_unsafe_filesystem: bool = False,
+) -> dict[str, Any]:
+    """Prepare a session and bind the signed scope manifest into that run."""
+
+    prepared = prepare_session(
+        cwd=cwd,
+        state_root=state_root,
+        allow_unsafe_filesystem=allow_unsafe_filesystem,
+    )
+    bound = bind_scope_to_run(
+        manifest.expanduser(),
+        run_id=str(prepared["run_id"]),
+        dest_root=Path(prepared["run_root"]),
+    )
+    prepared["scope_id"] = bound.scope_id
+    prepared["scope_hash"] = bound.hash
+    prepared["scope_file"] = str(Path(prepared["run_root"]) / "scope.json")
+    return prepared

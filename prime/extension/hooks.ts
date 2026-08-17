@@ -1,5 +1,9 @@
 import { detectKernel, type RuntimeState } from "./bootstrap.ts";
-import { ensureSidecar, stopSpawnedSidecar } from "./launch.ts";
+import {
+  ensureSidecar,
+  resolveScopeManifest,
+  stopSpawnedSidecar,
+} from "./launch.ts";
 import { ipythonBlockReason } from "./policy-gate.ts";
 import type {
   CustomMessage,
@@ -150,7 +154,18 @@ export function registerHooks(
     runtime.lastSessionReason = String(event.reason ?? "startup");
     armFromFlag(pi, runtime);
     if (runtime.sessionActive) {
-      await ensureSidecar(runtime, String(event.cwd ?? process.cwd()));
+      if (typeof pi.getFlag === "function") {
+        const flagged = pi.getFlag("ayran-manifest");
+        if (typeof flagged === "string" && flagged.trim()) {
+          runtime.scopeManifestPath = flagged.trim();
+        }
+      }
+      const cwd = String(event.cwd ?? process.cwd());
+      runtime.scopeManifestPath = resolveScopeManifest(
+        cwd,
+        runtime.scopeManifestPath,
+      );
+      await ensureSidecar(runtime, cwd);
     }
     if (!runtime.sessionActive) {
       return;
@@ -190,7 +205,7 @@ export function registerHooks(
 
   on("before_agent_start", async () => {
     armFromFlag(pi, runtime);
-    if (!runtime.sessionActive) {
+    if (!runtime.sessionActive || !runtime.injectionActive) {
       return undefined;
     }
     try {
@@ -355,6 +370,14 @@ export function registerHooks(
       event_type: "session_compact",
       payload: { summary_hash: summaryHash },
     });
+    if (!runtime.injectionActive) {
+      runtime.telemetry.event("info", "ayran.compact.after", {
+        summary_hash: summaryHash,
+        reconstruction_ok: false,
+        skipped: true,
+      });
+      return undefined;
+    }
     const pack = (await runtime.sidecar.tryCall("context.pack", {
       token_budget: runtime.settings.contextPackTokenBudget,
       purpose: "audit-turn",
