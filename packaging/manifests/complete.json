@@ -3,7 +3,7 @@
   "manifest_id": "ayran-complete-m9-input-v1",
   "artifact_kind": "ayran-complete",
   "milestone": "M9-private-release",
-  "ayran_payload": {"manifest": "packaging/manifests/ayran-payload.json", "payload_id": "ayran-m9-release-0.1.0"},
+  "ayran_payload": {"manifest": "packaging/manifests/ayran-payload.json", "payload_id": "ayran-release-0.1.5"},
   "platform": {"lock": "compatibility/platform-lock.json", "supported_runtime": "linux-wsl2", "native_windows": false},
   "prime": {
     "mode": "bundled-unmodified",

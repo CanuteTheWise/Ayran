@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-RELEASE_VERSION = "0.1.0"
-PAYLOAD_ID = "ayran-m9-release-0.1.0"
+RELEASE_VERSION = "0.1.5"
+PAYLOAD_ID = "ayran-release-0.1.5"
 PINNED_TIME = "2026-08-15T00:00:00Z"
 PRIME_VERSION = "0.7.2"
 PRIME_COMMIT = "83a0f9f9566219551fcb6ffaf7f519a815749a58"

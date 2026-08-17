@@ -1,49 +1,34 @@
 # Scope manifests
 
-A scope manifest is **not** the target contract or protocol. It is the signed
-policy envelope for one engagement: which relative paths Ayran may read or
-write, which actions are allowed, which hosts/endpoints are permitted, and
-when the engagement expires.
+A scope manifest is **sidecar policy**, not the target protocol.
 
-The Solidity, specs, and bounty notes live in the target tree (or in files
-you keep next to it). The manifest only **points at** those trees via
-`included_roots` / `excluded_roots` and lists allow/deny **rules**.
+`--ayran` **auto-binds** it from the workspace layout. You do not fill JSON.
+The **model does not author scope**.
 
-## Bind a manifest
+## One command
 
 ```text
-ayran start --manifest .ayran/scope.json --cwd .
-prime-agent --ayran --ayran-manifest .ayran/scope.json
-# inside Prime, after chatting:
+prime-agent --ayran
+# later, when you want audit packs:
 /ayran:activate
-/ayran:activate .ayran/scope.json
 ```
 
-`start` prepares a new run and rewrites `run_id` in a copy written to
-`~/.local/state/ayran/runs/<run_id>/scope.json`. The operator template can
-keep a placeholder `run_id`; the bound copy is what the sidecar loads.
+Detection prefers `src`, `contracts`, or `target/src`. Notes, bounty `.md` /
+`.txt`, compiler `out/`, `lib/`, reports, and `.prime` are not treated as
+the protocol. If Solidity files sit at the repo root, scope is `.` with
+those junk directories **excluded**.
 
-Until a manifest is bound, mapped audit actions fail closed with
-`no scope manifest is loaded`. Context packs stay off until `/ayran:activate`.
+Foundry, Slither, and solc are discovered on the WSL **PATH**. They should
+stay in your normal WSL install (for example under `/usr/local` or
+`~/.foundry`). They must not live inside the audit folder and are never
+copied or upgraded by Ayran.
 
-## Authoring from bounty markdown or text
+Human-gated: spend, sign, broadcast, submit, expand scope. No RPC unless
+you add hosts.
 
-Do not paste the bounty write-up into the JSON. Translate the **boundaries**:
+## Overrides (optional)
 
-| In the bounty notes | In the manifest |
-|---|---|
-| In-scope contracts / folders | `included_roots` (relative paths, e.g. `src`, `target/src`) |
-| Out of scope (mocks, deps, other products) | `excluded_roots` plus deny rules |
-| Read vs compile vs test | `rules` with `action` + `resource` + `effect` |
-| Contest end date | `valid_from` / `valid_until` (UTC) |
-| No broadcasting / no keys | already forbidden in policy; keep `approval_rules` |
-| Allowed RPC / APIs | `allowed_hosts`, `allowed_endpoints` |
-
-Start from `fixtures/contracts/scope-manifest/valid/minimal.json`. Stretch
-the validity window into the present, set `included_roots` to the in-scope
-directories of **this** clone, and keep `deny_overrides` true. Schema:
-`schemas/scope-manifest.schema.json`.
-
-Identifiers (`scope_id`, `rule_id`, …) use the form
-`prefix_` + 26 Crockford characters (see `ayran.graph.ids`). `run_id` is
-replaced when you `start` / `scope.load`.
+```text
+ayran start --roots src,contracts --cwd .
+prime-agent --ayran --ayran-manifest .ayran/scope.json
+```

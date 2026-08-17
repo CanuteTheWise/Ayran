@@ -65,12 +65,9 @@ def prepare_session(
     }
 
 
-def bind_scope_to_run(source: Path, *, run_id: str, dest_root: Path) -> ScopeManifest:
-    """Validate an operator scope template, pin it to ``run_id``, and write ``scope.json``."""
+def bind_scope_value(payload: dict[str, Any], *, run_id: str, dest_root: Path) -> ScopeManifest:
+    """Pin a validated scope object to ``run_id`` and write ``scope.json``."""
 
-    payload = strict_json_loads(source.read_bytes())
-    if not isinstance(payload, dict):
-        raise GraphError(CONTRACT_INVALID, "scope manifest file must be a single JSON object.")
     bound = dict(payload)
     bound["run_id"] = run_id
     integrity = dict(bound.get("integrity") or {})
@@ -86,26 +83,54 @@ def bind_scope_to_run(source: Path, *, run_id: str, dest_root: Path) -> ScopeMan
     return manifest
 
 
+def bind_scope_to_run(source: Path, *, run_id: str, dest_root: Path) -> ScopeManifest:
+    """Validate an operator scope template, pin it to ``run_id``, and write ``scope.json``."""
+
+    payload = strict_json_loads(source.read_bytes())
+    if not isinstance(payload, dict):
+        raise GraphError(CONTRACT_INVALID, "scope manifest file must be a single JSON object.")
+    return bind_scope_value(payload, run_id=run_id, dest_root=dest_root)
+
+
 def start_engagement(
     *,
     cwd: Path,
-    manifest: Path,
+    manifest: Path | None = None,
+    roots: list[str] | None = None,
     state_root: Path | None = None,
     allow_unsafe_filesystem: bool = False,
 ) -> dict[str, Any]:
-    """Prepare a session and bind the signed scope manifest into that run."""
+    """Prepare a session and bind a scope file or generated local-roots envelope."""
 
+    if manifest is not None and roots:
+        raise GraphError(
+            CONTRACT_INVALID,
+            "start accepts only one of --manifest or --roots.",
+        )
     prepared = prepare_session(
         cwd=cwd,
         state_root=state_root,
         allow_unsafe_filesystem=allow_unsafe_filesystem,
     )
-    bound = bind_scope_to_run(
-        manifest.expanduser(),
-        run_id=str(prepared["run_id"]),
-        dest_root=Path(prepared["run_root"]),
-    )
+    dest = Path(prepared["run_root"])
+    run_id = str(prepared["run_id"])
+    if manifest is not None:
+        bound = bind_scope_to_run(
+            manifest.expanduser(),
+            run_id=run_id,
+            dest_root=dest,
+        )
+    else:
+        from ayran.policy.local_scope import detect_local_roots, local_scope_manifest
+
+        chosen = list(roots) if roots else detect_local_roots(cwd)
+        bound = bind_scope_value(
+            local_scope_manifest(chosen, run_id=run_id, cwd=cwd),
+            run_id=run_id,
+            dest_root=dest,
+        )
     prepared["scope_id"] = bound.scope_id
     prepared["scope_hash"] = bound.hash
-    prepared["scope_file"] = str(Path(prepared["run_root"]) / "scope.json")
+    prepared["scope_file"] = str(dest / "scope.json")
+    prepared["included_roots"] = [item or "." for item in bound.included_roots]
     return prepared

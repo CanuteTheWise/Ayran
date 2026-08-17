@@ -97,7 +97,7 @@ def _trim_to_budget(
         drop_at = None
         for index in range(len(sections) - 1, -1, -1):
             title = str(sections[index]["title"])
-            if title.lower() not in protected and title not in {"Scope", "Policy constraints"}:
+            if title.lower() not in protected and title not in {"Scope"}:
                 drop_at = index
                 break
         if drop_at is None:
@@ -238,14 +238,15 @@ def compile_from_view(
     if view.manual_next:
         next_action = "manual_next: wait for operator or model input"
 
+    roots = [item or "." for item in view.included_roots]
+    root_text = ", ".join(roots) if roots else "none bound"
     policy_content = (
-        "Treat the signed scope manifest as authoritative. Historical similarity "
-        "and model confidence are not target evidence. Never describe an untested "
-        "surface as safe. Never paraphrase an assumption as a fact. Evidence ceilings "
-        "are preserved: a lead cannot be promoted to observed by this compiler."
+        f"In-scope paths: {root_text}. The sidecar denies mapped tools outside those "
+        "paths; do not retry denials. Leads are not findings. Do not call an untested "
+        "surface safe."
     )
     if view.policy_constraints:
-        policy_content = policy_content + " Constraints: " + "; ".join(view.policy_constraints[:8])
+        policy_content = policy_content + " " + "; ".join(view.policy_constraints[:4])
 
     retrieved_lines: list[str] = []
     retrieved_ids: list[str] = []
@@ -273,7 +274,6 @@ def compile_from_view(
         _section("DETERMINISTIC_FACT", "Known facts", facts_text, fact_ids),
         _section("ASSUMPTION", "Assumptions", assumptions_text, []),
         _section("ASSUMPTION", "Open questions", question_text, question_ids),
-        _section("POLICY", "Policy constraints", policy_content, []),
         _section("HYPOTHESIS", "Unverified leads", lead_text, lead_ids),
     ]
     if retrieved_text and policy == "graph_aware":

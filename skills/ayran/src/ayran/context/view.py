@@ -42,6 +42,7 @@ class GraphView:
     payload_strikes: dict[str, int] = field(default_factory=dict)
     quarantined_sources: list[str] = field(default_factory=list)
     policy_constraints: list[str] = field(default_factory=list)
+    included_roots: list[str] = field(default_factory=list)
     high_value_clusters: list[str] = field(default_factory=list)
     target_first_completed: list[str] = field(default_factory=list)
     tool_health: dict[str, str] = field(default_factory=dict)

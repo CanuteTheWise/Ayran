@@ -282,6 +282,8 @@ class BridgeDispatcher:
             purpose=purpose,
             role=role,
             knowledge_policy=str(params["knowledge_policy"]) if params.get("knowledge_policy") else None,
+            included_roots=list(self.scope.included_roots) if self.scope else None,
+            scope_id=self.scope.scope_id if self.scope else None,
         )
         pack = result["pack"]
         reconstruction = {

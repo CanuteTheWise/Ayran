@@ -86,9 +86,14 @@ def _parser() -> argparse.ArgumentParser:
     service.add_argument("--socket", type=Path, default=None)
     service.add_argument("--token-file", type=Path, default=None)
 
-    start = sub.add_parser("start", help="prepare a run and bind a signed scope manifest")
+    start = sub.add_parser("start", help="prepare a run and auto-bind scope")
     _add_config(start)
-    start.add_argument("--manifest", type=Path, required=True, help="path to the scope manifest JSON")
+    start.add_argument("--manifest", type=Path, default=None, help="path to a full scope-manifest JSON")
+    start.add_argument(
+        "--roots",
+        default=None,
+        help="comma-separated relative in-scope paths; generates the policy envelope",
+    )
     start.add_argument("--cwd", type=Path, default=None)
     start.add_argument("--state-root", type=Path, default=None)
     start.add_argument(
@@ -104,6 +109,7 @@ def _parser() -> argparse.ArgumentParser:
     session_prepare.add_argument("--cwd", type=Path, default=None)
     session_prepare.add_argument("--state-root", type=Path, default=None)
     session_prepare.add_argument("--manifest", type=Path, default=None)
+    session_prepare.add_argument("--roots", default=None)
     session_prepare.add_argument(
         "--allow-unsafe-filesystem", action="store_true", help=argparse.SUPPRESS
     )
@@ -423,7 +429,7 @@ def _command_service(config, run: str, state_root: Path | None, socket: Path | N
 
 
 def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
-    from ayran.runtime.session import prepare_session, start_engagement
+    from ayran.runtime.session import start_engagement
 
     if arguments.session_command != "prepare":
         raise ValueError(f"unsupported session command: {arguments.session_command}")
@@ -431,6 +437,18 @@ def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  
     state = Path(arguments.state_root) if arguments.state_root else Path(config.state_root)
     unsafe = bool(getattr(arguments, "allow_unsafe_filesystem", False))
     manifest = getattr(arguments, "manifest", None)
+    roots_raw = getattr(arguments, "roots", None)
+    if manifest is not None and roots_raw:
+        raise ValueError("use only one of --manifest or --roots")
+    if roots_raw:
+        from ayran.policy.local_scope import parse_roots
+
+        return start_engagement(
+            cwd=cwd,
+            roots=parse_roots(str(roots_raw)),
+            state_root=state,
+            allow_unsafe_filesystem=unsafe,
+        )
     if manifest is not None:
         return start_engagement(
             cwd=cwd,
@@ -438,20 +456,33 @@ def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  
             state_root=state,
             allow_unsafe_filesystem=unsafe,
         )
-    return prepare_session(cwd=cwd, state_root=state, allow_unsafe_filesystem=unsafe)
+    return start_engagement(cwd=cwd, state_root=state, allow_unsafe_filesystem=unsafe)
 
 
 def _command_start(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    from ayran.policy.local_scope import parse_roots
     from ayran.runtime.session import start_engagement
 
     cwd = Path(arguments.cwd) if arguments.cwd else Path.cwd()
     state = Path(arguments.state_root) if arguments.state_root else Path(config.state_root)
-    return start_engagement(
-        cwd=cwd,
-        manifest=Path(arguments.manifest),
-        state_root=state,
-        allow_unsafe_filesystem=bool(getattr(arguments, "allow_unsafe_filesystem", False)),
-    )
+    unsafe = bool(getattr(arguments, "allow_unsafe_filesystem", False))
+    if arguments.manifest and arguments.roots:
+        raise ValueError("use only one of --manifest or --roots")
+    if arguments.roots:
+        return start_engagement(
+            cwd=cwd,
+            roots=parse_roots(str(arguments.roots)),
+            state_root=state,
+            allow_unsafe_filesystem=unsafe,
+        )
+    if arguments.manifest:
+        return start_engagement(
+            cwd=cwd,
+            manifest=Path(arguments.manifest),
+            state_root=state,
+            allow_unsafe_filesystem=unsafe,
+        )
+    return start_engagement(cwd=cwd, state_root=state, allow_unsafe_filesystem=unsafe)
 
 
 def _command_tools(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]

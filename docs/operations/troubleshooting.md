@@ -11,16 +11,14 @@ Interpret `doctor_status`:
 
 ## First session (`prime-agent --ayran`)
 
-`--ayran` starts the sidecar. It does not inject audit context packs until
-`/ayran:activate`. Bind a signed scope with `--ayran-manifest`, `AYRAN_SCOPE`,
-`.ayran/scope.json`, `ayran start --manifest`, or `/ayran:activate <path>`.
+`--ayran` starts the sidecar and auto-binds scope from the workspace layout
+(`src` / `contracts` / nearby `.sol` / `.`). It does not inject audit context
+packs until `/ayran:activate`. Override with `--ayran-manifest`, `AYRAN_SCOPE`,
+or `.ayran/scope.json`.
 
-`no scope manifest is loaded; fail closed` means the run has no `scope.json`,
-not that the sidecar is down. If `run.ping` succeeds, load a manifest.
-
-If the model deep-thinks on a greeting, injection is still on for that
-session (restart Prime after upgrading, then activate only when you want
-audit packs). See [scope.md](scope.md).
+`no scope manifest is loaded; fail closed` should not happen on a current
+`--ayran` session. If it does, the Layer prefix is stale — refresh from the
+Ayran tree. See [scope.md](scope.md).
 
 ## Common error codes
 

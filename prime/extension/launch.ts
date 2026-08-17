@@ -108,10 +108,10 @@ export async function ensureSidecar(
   }
   const python = resolveAyranPython();
   const manifest = runtime.scopeManifestPath;
-  const prepareArgs =
-    manifest.length > 0
-      ? ["-m", "ayran.cli", "start", "--manifest", manifest, "--cwd", cwd]
-      : ["-m", "ayran.cli", "session", "prepare", "--cwd", cwd];
+  const prepareArgs = ["-m", "ayran.cli", "start", "--cwd", cwd];
+  if (manifest.length > 0) {
+    prepareArgs.push("--manifest", manifest);
+  }
   const prepared = spawnSync(python, prepareArgs, {
     encoding: "utf8",
     timeout: 30_000,

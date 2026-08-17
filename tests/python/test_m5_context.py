@@ -61,6 +61,9 @@ def test_checksum_is_deterministic() -> None:
     assert footer == first["integrity"]["content_hash"]
     assert "[POLICY]" in compiled["injection_text"]
     assert "[HYPOTHESIS]" in compiled["injection_text"]
+    assert "In-scope paths:" in compiled["injection_text"]
+    assert "Policy constraints" not in compiled["injection_text"]
+    assert "approval_rules" not in compiled["injection_text"]
 
 
 def test_collapse_reconstruction_from_graph_view() -> None:

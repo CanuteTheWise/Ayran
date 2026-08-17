@@ -6,7 +6,7 @@
 
 Ayran is a private, local-first autonomous smart-contract security audit harness. It wraps the Prime-Agent CLI with a structured evidence pipeline that turns a configured AI model into a disciplined auditor — one that maps attack surfaces, proposes hypotheses, executes tools to prove or disprove them, enforces validation gates, retains what it learns between audits, and produces defensible reports where every claim resolves to recorded evidence.
 
-The current release is **0.1.0**, a complete vertical slice covering milestones M0 through M9. It targets Solidity/EVM contracts on WSL2, runs entirely offline, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
+The current release is **0.1.5**. It covers milestones M0 through M9 plus a one-command `--ayran` session (auto-bound scope, injection after `/ayran:activate`). It targets Solidity/EVM contracts on WSL2, runs entirely offline, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
 
 ---
 
@@ -30,7 +30,7 @@ Using a plain AI agent for smart-contract auditing creates several structural pr
 
 Ayran is a package that layers onto a stock Prime-Agent installation without modifying it. It consists of three components working together:
 
-**1. Prime extension (TypeScript)** — the bridge. Prime discovers Ayran as a package. At every model turn, the extension injects a bounded, labeled context pack into the model's context. It gates tool calls through policy, injects checkpoint state after compaction, and exposes `/ayran:*` slash commands.
+**1. Prime extension (TypeScript)** — the bridge. Prime discovers Ayran as a package. After `/ayran:activate`, the extension injects a bounded, labeled context pack into the model's context. It gates tool calls through sidecar policy, injects checkpoint state after compaction, and exposes `/ayran:*` slash commands.
 
 **2. Sidecar engine (Python)** — the brain. A per-run Unix-domain-socket JSON-RPC server that owns the journal, database projections, policy engine, tool adapters, context compiler, event router, evidence pipeline, knowledge corpus, and promotion pipeline. Only the sidecar writes to canonical state; the extension is a client.
 
@@ -241,11 +241,11 @@ After a project-local `prime-agent package install <ayran-pkg> --local`:
 # WSL, venv on PATH:
 source "$HOME/.local/ayran-venv/bin/activate"
 prime-agent --ayran
-# or, bind a signed scope when the sidecar starts:
-prime-agent --ayran --ayran-manifest .ayran/scope.json
 ```
 
-`--ayran` starts the sidecar for this session and shuts it down on `/quit`. It does **not** inject audit context packs until you turn them on. Plain `prime-agent` does not start Ayran and does not fail-close tools.
+That one command starts the sidecar and **auto-binds scope** from the repo layout (`src`, `contracts`, or `.`). You do not write a scope JSON. The model does not write it either — expanding its own permissions would be a jailbreak. Chat stays normal until `/ayran:activate`. Plain `prime-agent` does not start Ayran.
+
+Optional overrides: `--ayran-manifest path.json`, `AYRAN_SCOPE`, or `.ayran/scope.json`.
 
 ```bash
 # Inside Prime: chat normally, then arm injection for the rest of the session
@@ -275,8 +275,10 @@ Rollback and uninstall remove ONLY what Ayran installed. Your existing Prime, Fo
 
 ```text
 # Audit lifecycle
-ayran start --manifest <scope>          # prepare a run and bind the signed scope manifest
-ayran session prepare [--cwd <path>]    # create stream/token/socket for prime-agent --ayran
+ayran start                             # auto-detect in-scope folders and bind
+ayran start --roots src,contracts       # override detected folders
+ayran start --manifest <scope>          # bind a custom scope-manifest JSON
+ayran session prepare [--cwd <path>]    # same auto-bind as start, for --ayran
 ayran service --run <id>                # run the local JSON-RPC sidecar
 ayran status --run <id>                 # show run status, phase, budget
 ayran doctor                            # full system health check
@@ -458,6 +460,7 @@ The extension's `ipython` tool-blocking is best-effort and is NOT a security bou
 ### Operations
 
 - [Install guide](docs/operations/install.md)
+- [Scope](docs/operations/scope.md)
 - [Security model](docs/operations/security.md)
 - [Troubleshooting](docs/operations/troubleshooting.md)
 - [Upgrade guide](docs/operations/upgrade.md)
@@ -467,6 +470,6 @@ The extension's `ipython` tool-blocking is best-effort and is NOT a security bou
 
 ## License and distribution
 
-Ayran 0.1.0 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
+Ayran 0.1.5 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
 
-This is version 0.1.0 — the first private build. It is not a certified release. Live-model A0–A7 evaluation with real model provider API calls has not been executed. The `createAgentSession` SDK interface requires a live Prime runtime for full validation.
+This is version 0.1.5. It is not a certified release. Live-model A0–A7 evaluation with real model provider API calls has not been executed. The `createAgentSession` SDK interface requires a live Prime runtime for full validation.

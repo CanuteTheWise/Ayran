@@ -28,6 +28,8 @@ def compile_pack(
     purpose: str = "audit-turn",
     role: str = "root-auditor",
     knowledge_policy: str | None = None,
+    included_roots: list[str] | None = None,
+    scope_id: str | None = None,
 ) -> dict[str, Any]:
     queries = OntologyQueries(store=store)
     view = snapshot_view(
@@ -40,6 +42,10 @@ def compile_pack(
     view.role = role
     if knowledge_policy:
         view.knowledge_policy = knowledge_policy
+    if included_roots:
+        view.included_roots = list(included_roots)
+    if scope_id:
+        view.scope_id = scope_id
     compiled = compile_with_injection(view, token_budget=token_budget, purpose=purpose, role=role)
     compiled["schema_version"] = "1.0.0"
     compiled["injection_text"] = compiled.get("injection_text") or serialize_injection(compiled["pack"])

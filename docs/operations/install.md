@@ -28,7 +28,7 @@ install-ayran.sh --complete --prefix ~/.local/ayran
 install-ayran.sh --layer --prime /path/to/prime --dry-run
 ayran release install --layer --prime <path> --prefix <prefix>
 ayran release install --complete --prefix <prefix>
-ayran release validate --path dist/ayran-layer-0.1.0.tar.gz
+ayran release validate --path dist/ayran-layer-0.1.5.tar.gz
 ```
 
 `--dry-run` prints the exact plan (created paths, Prime classification, no Windows writes outside `dist`/explicit reports) and makes no changes.
