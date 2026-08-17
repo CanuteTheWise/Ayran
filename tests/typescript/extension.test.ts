@@ -71,6 +71,19 @@ function mockPi(): MockPi {
   return api;
 }
 
+test("--ayran is honored on session_start after Prime applies flags", async () => {
+  const pi = mockPi();
+  let ayran = false;
+  pi.getFlag = (name) => name === "ayran" && ayran;
+  const runtime = createRuntime(root);
+  runtime.autoStartSidecar = false;
+  activate(pi, root, runtime);
+  assert.equal(runtime.sessionActive, false);
+  ayran = true;
+  await pi.fire("session_start", { reason: "startup" });
+  assert.equal(runtime.sessionActive, true);
+});
+
 test("--ayran flag arms the session", () => {
   const pi = mockPi();
   pi.getFlag = (name) => name === "ayran";

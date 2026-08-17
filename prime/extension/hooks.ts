@@ -117,6 +117,16 @@ function extractHandle(value: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
+function armFromFlag(pi: ExtensionAPI, runtime: RuntimeState): void {
+  if (
+    !runtime.sessionActive &&
+    typeof pi.getFlag === "function" &&
+    pi.getFlag("ayran")
+  ) {
+    runtime.sessionActive = true;
+  }
+}
+
 export function registerHooks(
   pi: ExtensionAPI,
   runtime: RuntimeState,
@@ -138,6 +148,7 @@ export function registerHooks(
 
   on("session_start", async (event) => {
     runtime.lastSessionReason = String(event.reason ?? "startup");
+    armFromFlag(pi, runtime);
     if (runtime.sessionActive) {
       await ensureSidecar(runtime, String(event.cwd ?? process.cwd()));
     }
@@ -178,6 +189,7 @@ export function registerHooks(
   });
 
   on("before_agent_start", async () => {
+    armFromFlag(pi, runtime);
     if (!runtime.sessionActive) {
       return undefined;
     }
@@ -219,6 +231,7 @@ export function registerHooks(
   });
 
   on("tool_call", async (event) => {
+    armFromFlag(pi, runtime);
     if (!runtime.sessionActive) {
       return undefined;
     }
