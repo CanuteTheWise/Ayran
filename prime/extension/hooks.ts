@@ -1,4 +1,5 @@
 import { detectKernel, type RuntimeState } from "./bootstrap.ts";
+import { ensureSidecar, stopSpawnedSidecar } from "./launch.ts";
 import { ipythonBlockReason } from "./policy-gate.ts";
 import type {
   CustomMessage,
@@ -137,6 +138,12 @@ export function registerHooks(
 
   on("session_start", async (event) => {
     runtime.lastSessionReason = String(event.reason ?? "startup");
+    if (runtime.sessionActive) {
+      await ensureSidecar(runtime, String(event.cwd ?? process.cwd()));
+    }
+    if (!runtime.sessionActive) {
+      return;
+    }
     await detectKernel(runtime);
     const status = await runtime.sidecar.tryCall("run.status");
     if (status === undefined) {
@@ -171,6 +178,9 @@ export function registerHooks(
   });
 
   on("before_agent_start", async () => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     try {
       return { message: await injectPack(runtime) };
     } catch (error) {
@@ -209,6 +219,9 @@ export function registerHooks(
   });
 
   on("tool_call", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     const toolName = String(event.toolName ?? "");
     const input = asRecord(event.input);
     if (toolName === "ipython") {
@@ -259,6 +272,9 @@ export function registerHooks(
   });
 
   on("tool_result", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     if (String(event.toolName ?? "") !== "ipython") {
       return undefined;
     }
@@ -270,6 +286,9 @@ export function registerHooks(
   });
 
   on("message_end", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     const message = asRecord(event.message ?? event);
     if (message.customType === "rlm_child_failure") {
       await runtime.sidecar.tryCall("child.fail", {
@@ -291,6 +310,9 @@ export function registerHooks(
   });
 
   on("session_before_compact", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     const summaryHash = sha256Hex(JSON.stringify(event.preparation ?? event));
     const recorded = await runtime.sidecar.tryCall("lifecycle.record", {
       event_type: "session_before_compact",
@@ -310,6 +332,9 @@ export function registerHooks(
   });
 
   on("session_compact", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     const summaryHash = sha256Hex(
       JSON.stringify(event.compactionEntry ?? event),
     );
@@ -331,6 +356,9 @@ export function registerHooks(
   });
 
   on("session_before_switch", async (event) => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     await runtime.sidecar.tryCall("lifecycle.record", {
       event_type: "session_before_switch",
       payload: { reason: String(event.reason ?? "switch") },
@@ -343,6 +371,9 @@ export function registerHooks(
   });
 
   on("session_before_fork", async () => {
+    if (!runtime.sessionActive) {
+      return undefined;
+    }
     await runtime.sidecar.tryCall("lifecycle.record", {
       event_type: "session_before_fork",
       payload: { reason: "fork" },
@@ -359,14 +390,19 @@ export function registerHooks(
       return;
     }
     runtime.closed = true;
-    const timeout = runtime.settings.shutdownTimeoutMs;
-    const shutdown = runtime.sidecar
-      .call("run.shutdown")
-      .catch(() => undefined);
-    const timer = new Promise((resolve) => {
-      setTimeout(resolve, timeout);
-    });
-    await Promise.race([shutdown, timer]);
+    if (runtime.sessionActive) {
+      const timeout = runtime.settings.shutdownTimeoutMs;
+      const shutdown = runtime.sidecar
+        .call("run.shutdown")
+        .catch(() => undefined);
+      const timer = new Promise((resolve) => {
+        setTimeout(resolve, timeout);
+      });
+      await Promise.race([shutdown, timer]);
+      if (runtime.spawnedSidecar) {
+        stopSpawnedSidecar(runtime);
+      }
+    }
     runtime.sidecar.close();
     runtime.telemetry.event("info", "ayran.shutdown", {
       reason: String(event.reason ?? "quit"),

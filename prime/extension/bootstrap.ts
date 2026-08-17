@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import type { ChildProcess } from "node:child_process";
 import { SidecarClient } from "./sidecar.ts";
 import { Telemetry, type TelemetryLevel } from "./telemetry.ts";
 
@@ -43,6 +44,10 @@ export interface RuntimeState {
   lastPackHash: string | undefined;
   lastSessionReason: string | undefined;
   closed: boolean;
+  sessionActive: boolean;
+  sidecarProcess: ChildProcess | undefined;
+  spawnedSidecar: boolean;
+  autoStartSidecar: boolean;
 }
 
 interface SettingsFile {
@@ -137,7 +142,23 @@ export function createRuntime(cwd: string): RuntimeState {
     lastPackHash: undefined,
     lastSessionReason: undefined,
     closed: false,
+    sessionActive: Boolean(settings.sidecarSocketPath),
+    sidecarProcess: undefined,
+    spawnedSidecar: false,
+    autoStartSidecar: true,
   };
+}
+
+export function bindSidecar(
+  runtime: RuntimeState,
+  socketPath: string,
+  tokenFile: string,
+  runId: string,
+): void {
+  runtime.settings.sidecarSocketPath = socketPath;
+  runtime.settings.tokenFile = tokenFile;
+  runtime.settings.runId = runId;
+  runtime.sidecar = new SidecarClient(socketPath, tokenFile);
 }
 
 export async function detectKernel(runtime: RuntimeState): Promise<void> {

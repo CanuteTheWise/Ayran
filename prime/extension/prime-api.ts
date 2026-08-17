@@ -37,9 +37,17 @@ export interface RegisteredCommandOptions {
   handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
 }
 
+export interface RegisteredFlagOptions {
+  description?: string;
+  type?: "boolean" | "string";
+  default?: unknown;
+}
+
 export interface ExtensionAPI {
   on(event: string, handler: HookHandler): void;
   registerCommand(name: string, options: RegisteredCommandOptions): void;
+  registerFlag?(name: string, options?: RegisteredFlagOptions): void;
+  getFlag?(name: string): unknown;
   sendMessage(
     message: CustomMessage,
     options?: {

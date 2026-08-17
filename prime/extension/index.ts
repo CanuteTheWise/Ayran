@@ -20,10 +20,21 @@ export function activate(
   runtime: RuntimeState = createRuntime(cwd),
 ): RuntimeState {
   try {
+    if (typeof pi.registerFlag === "function") {
+      pi.registerFlag("ayran", {
+        description: "Start the Ayran sidecar for this session",
+        type: "boolean",
+        default: false,
+      });
+    }
+    if (typeof pi.getFlag === "function" && pi.getFlag("ayran")) {
+      runtime.sessionActive = true;
+    }
     registerHooks(pi, runtime);
     registerCommands(pi, runtime);
     runtime.telemetry.event("info", "ayran.extension.loaded", {
       sidecar_configured: Boolean(runtime.settings.sidecarSocketPath),
+      session_active: runtime.sessionActive,
     });
   } catch (error) {
     runtime.telemetry.event("error", "ayran.extension.load_failed", {

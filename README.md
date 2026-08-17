@@ -235,34 +235,21 @@ This checks: Prime version compatibility, ext4 placement, Python environment, ex
 
 ### First audit
 
+After a project-local `prime-agent package install <ayran-pkg> --local`:
+
 ```bash
-# In WSL, navigate to your target and create a scope manifest:
-cp .prime-template/agent/settings.json my-audit-settings.json
-# Edit my-audit-settings.json to point to your target repo and configure scope
+# WSL, venv on PATH:
+source "$HOME/.local/ayran-venv/bin/activate"
+prime-agent --ayran
+```
 
-# Start Ayran:
-prime --package ~/.local/ayran/package --cwd .  # start Prime with Ayran loaded
+`--ayran` starts the sidecar for this session and shuts it down on `/quit`. Plain `prime-agent` does not start Ayran and does not fail-close tools.
 
-# In Prime, initialize the audit:
-/ayran-start ./path/to/target-repo ./scope-manifest.json
-
-# Ayran will:
-# 1. Parse the target
-# 2. Build attack-surface maps
-# 3. Initialize the Target Graph
-# 4. Start the six hypothesis drivers
-
-# Monitor progress:
-/ayran-status
-
-# Check coverage:
-ayran coverage summary
-
-# View findings:
-ayran report render <finding_id>
-
-# Stop gracefully:
-/ayran-stop
+```bash
+# Optional: inspect sidecar health from inside Prime
+/ayran:status
+/ayran:doctor
+/ayran:stop
 ```
 
 ### Uninstall and rollback
@@ -284,6 +271,8 @@ Rollback and uninstall remove ONLY what Ayran installed. Your existing Prime, Fo
 ```text
 # Audit lifecycle
 ayran start --manifest <scope>          # initialize an engagement
+ayran session prepare [--cwd <path>]    # create stream/token/socket for prime-agent --ayran
+ayran service --run <id>                # run the local JSON-RPC sidecar
 ayran status --run <id>                 # show run status, phase, budget
 ayran doctor                            # full system health check
 ayran diagnose --run <id> --bundle <path>  # export diagnostic bundle

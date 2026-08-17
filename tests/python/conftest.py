@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
+import shutil
 import sys
+import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -8,6 +12,23 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "skills" / "ayran" / "src"))
+
+
+@pytest.fixture
+def short_state_root() -> Iterator[Path]:
+    """Keep ``.../runtime/<run_id>/ayrand.sock`` under the 107-byte sun_path limit."""
+
+    base = Path("/tmp/t") if os.name != "nt" else Path.home() / "t"
+    base.mkdir(parents=True, exist_ok=True)
+    path = Path(tempfile.mkdtemp(prefix="s", dir=base))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            base.rmdir()
+        except OSError:
+            pass
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

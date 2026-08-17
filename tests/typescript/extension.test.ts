@@ -51,6 +51,10 @@ function mockPi(): MockPi {
     registerCommand(name, options) {
       commands.set(name, options);
     },
+    registerFlag() {},
+    getFlag() {
+      return false;
+    },
     sendMessage() {},
     appendEntry(customType, data) {
       entries.push({ customType, data });
@@ -67,9 +71,43 @@ function mockPi(): MockPi {
   return api;
 }
 
-test("extension loads without sidecar and does not crash", async () => {
+test("--ayran flag arms the session", () => {
+  const pi = mockPi();
+  pi.getFlag = (name) => name === "ayran";
+  const runtime = createRuntime(root);
+  activate(pi, root, runtime);
+  assert.equal(runtime.sessionActive, true);
+});
+
+test("idle session_start does not spawn sidecar", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
+  activate(pi, root, runtime);
+  await pi.fire("session_start", { reason: "startup" });
+  assert.equal(runtime.sessionActive, false);
+  assert.equal(runtime.sidecarProcess, undefined);
+  assert.equal(runtime.spawnedSidecar, false);
+});
+
+test("idle session does not inject context or fail-close tools", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  activate(pi, root, runtime);
+  assert.equal(runtime.sessionActive, false);
+  const injected = await pi.fire("before_agent_start", { prompt: "hello" });
+  assert.equal(injected[0], undefined);
+  const tools = (await pi.fire("tool_call", {
+    toolName: "read",
+    input: { path: "target/src/Vault.sol" },
+  })) as Array<{ block?: boolean } | undefined>;
+  assert.equal(tools[0], undefined);
+});
+
+test("armed session without sidecar injects a degraded pack and fail-closes tools", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
   activate(pi, root, runtime);
   const results = await pi.fire("before_agent_start", { prompt: "hello" });
   const injected = results[0] as {
@@ -77,6 +115,11 @@ test("extension loads without sidecar and does not crash", async () => {
   };
   assert.equal(injected.message?.customType, "ayran.context_pack");
   assert.match(String(injected.message?.content), /unavailable/i);
+  const blocked = (await pi.fire("tool_call", {
+    toolName: "read",
+    input: { path: "target/src/Vault.sol" },
+  })) as Array<{ block?: boolean }>;
+  assert.equal(blocked[0]?.block, true);
 });
 
 test("hook registration has no duplicate handlers", () => {
@@ -91,9 +134,12 @@ test("hook registration has no duplicate handlers", () => {
   assert.ok(pi.handlers.has("session_shutdown"));
 });
 
-test("degraded sidecar fail-closes mapped tool calls", async () => {
+test("degraded sidecar fail-closes mapped tool calls when armed", async () => {
   const pi = mockPi();
-  activate(pi, root, createRuntime(root));
+  const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
+  activate(pi, root, runtime);
   const blocked = (await pi.fire("tool_call", {
     toolName: "read",
     input: { path: "target/src/Vault.sol" },
@@ -104,6 +150,8 @@ test("degraded sidecar fail-closes mapped tool calls", async () => {
 test("ipython disallowed payloads are blocked with a not-a-sandbox warning", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async () => ({ permitted: true, routed: false });
   activate(pi, root, runtime);
   const blocked = (await pi.fire("tool_call", {
@@ -117,6 +165,8 @@ test("ipython disallowed payloads are blocked with a not-a-sandbox warning", asy
 test("policy gate rejects denied tools and passes allowed tools", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async (method, params = {}) => {
     if (method !== "policy.authorize") {
       return { ok: true };
@@ -146,6 +196,8 @@ test("policy gate rejects denied tools and passes allowed tools", async () => {
 test("session switch fork and compact re-inject without crashing", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
   const calls: string[] = [];
   runtime.sidecar.tryCall = async (method) => {
     calls.push(method);
@@ -185,6 +237,8 @@ test("session switch fork and compact re-inject without crashing", async () => {
 test("command surface is self-documenting", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async (method) => ({
     method,
     sidecar: "reachable",
@@ -207,6 +261,8 @@ test("repeated start and shutdown is clean ten times", async () => {
   for (let index = 0; index < 10; index += 1) {
     const pi = mockPi();
     const runtime = createRuntime(root);
+    runtime.sessionActive = true;
+    runtime.autoStartSidecar = false;
     runtime.sidecar.call = async () => ({ run_state: "stopped" });
     runtime.sidecar.tryCall = async () => ({ ok: true });
     activate(pi, root, runtime);

@@ -86,6 +86,18 @@ def _parser() -> argparse.ArgumentParser:
     service.add_argument("--socket", type=Path, default=None)
     service.add_argument("--token-file", type=Path, default=None)
 
+    session = sub.add_parser("session", help="prepare a Prime-session sidecar run")
+    session_sub = session.add_subparsers(dest="session_command", required=True)
+    session_prepare = session_sub.add_parser(
+        "prepare", help="create stream, token, and socket paths for one session"
+    )
+    _add_config(session_prepare)
+    session_prepare.add_argument("--cwd", type=Path, default=None)
+    session_prepare.add_argument("--state-root", type=Path, default=None)
+    session_prepare.add_argument(
+        "--allow-unsafe-filesystem", action="store_true", help=argparse.SUPPRESS
+    )
+
     tools = sub.add_parser("tools", help="capability registry, detection, and adapter invocation")
     tools_sub = tools.add_subparsers(dest="tools_command", required=True)
     tools_list = tools_sub.add_parser("list", help="list capabilities and detection status")
@@ -398,6 +410,20 @@ def _command_service(config, run: str, state_root: Path | None, socket: Path | N
     from ayran.runtime.service_main import service_main
 
     return service_main(config, run_id=run, state_root=state_root, socket=socket, token_file=token_file)
+
+
+def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    from ayran.runtime.session import prepare_session
+
+    if arguments.session_command != "prepare":
+        raise ValueError(f"unsupported session command: {arguments.session_command}")
+    cwd = Path(arguments.cwd) if arguments.cwd else Path.cwd()
+    state = Path(arguments.state_root) if arguments.state_root else Path(config.state_root)
+    return prepare_session(
+        cwd=cwd,
+        state_root=state,
+        allow_unsafe_filesystem=bool(getattr(arguments, "allow_unsafe_filesystem", False)),
+    )
 
 
 def _command_tools(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
@@ -877,6 +903,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _command_recover(config, arguments.run, state_root)
         elif arguments.command == "service":
             result = _command_service(config, arguments.run, state_root, arguments.socket, arguments.token_file)
+        elif arguments.command == "session":
+            result = _command_session(config, arguments)
         elif arguments.command == "tools":
             result = _command_tools(config, arguments)
         elif arguments.command == "context":
