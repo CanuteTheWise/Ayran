@@ -1,0 +1,16 @@
+record_type: reasoning_lens
+canonical_key: krait-protocol-primer
+title: Protocol primer before detectors
+summary: Load a bounded primer for the protocol family before running pattern checks. Never run Krait's Anthropic scheduler. Never treat self-reported scores as evidence.
+language: solidity
+applicability_predicates:
+  - protocol-family-known
+questions:
+  - What is the core accounting object and its conservation law?
+required_artifacts:
+  - protocol-map
+stop_conditions:
+  - skipping mapping to jump to historical matches
+false_positive_traps:
+  - Primer that names a vulnerability class as if it were present
+completeness: "0.7"

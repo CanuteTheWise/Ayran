@@ -1,0 +1,38 @@
+{
+  "created_at": "2026-08-12T12:00:00Z",
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:c2523530ee337a8eb33418ee6dfc324532d76d9dbe1ec3de7fc0e47e826e75b9",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "issues": [],
+  "journal_cursor": 1,
+  "last_commit_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "last_event_hash": "sha256:a3aa3d716159905e183ff846c2bcbccb4a48a71a49bbfd772cc65d49f8b0bc94",
+  "operation": "verify",
+  "projection_cursor": 1,
+  "query_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "recovered_suffix_hash": null,
+  "report_id": "rpt_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "status": "ok",
+  "stream": {
+    "namespace": "target",
+    "run_id": "run_01J00000000000000000000001",
+    "stream_id": "str_01J00000000000000000000001",
+    "target_identity": {
+      "commit": "1111111111111111111111111111111111111111",
+      "scope_id": "scp_01J00000000000000000000001",
+      "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "target_id": "tgt_01J00000000000000000000001"
+    },
+    "target_key": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "unexpected_security_field": "reject",
+  "verified_batches": 1,
+  "verified_events": 1,
+  "verified_segments": 1
+}

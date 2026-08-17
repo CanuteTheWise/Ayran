@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/hypothesis.schema.json",
+  "title": "Hypothesis",
+  "description": "Target-specific security hypothesis with one of six origins, separated priors/evidence, falsifiers, budget, and immutable transition lineage.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "hypothesis_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "origin",
+    "claim",
+    "invariant_ids",
+    "attack_path",
+    "target_entities",
+    "preconditions",
+    "impact_premise",
+    "priors",
+    "novelty",
+    "required_falsifiers",
+    "budget",
+    "parent_ids",
+    "duplicate_candidate_ids",
+    "status",
+    "evidence_grade",
+    "trust_class",
+    "confidence",
+    "transition_history",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "hypothesis_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "origin": { "$ref": "common.schema.json#/$defs/HypothesisOrigin" },
+    "claim": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "invariant_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "attack_path": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "target_entities": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "status", "attacker_can_create"],
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "status": {
+            "type": "string",
+            "enum": ["unknown", "source_claim", "observed", "refuted"]
+          },
+          "attacker_can_create": { "type": ["boolean", "null"] }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "impact_premise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description", "upper_bound"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "asset_theft",
+            "unbacked_claim",
+            "debt_escape",
+            "governance_takeover",
+            "permanent_lock",
+            "mev_extraction",
+            "integrity_violation",
+            "availability"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "upper_bound": { "type": ["string", "null"], "maxLength": 128 }
+      }
+    },
+    "priors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "confidence"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["model", "historical", "tool", "human"]
+          },
+          "confidence": { "$ref": "common.schema.json#/$defs/Confidence" }
+        }
+      },
+      "maxItems": 32
+    },
+    "novelty": {
+      "type": "string",
+      "enum": ["unknown", "no_known_precedent", "variant", "known_mechanism"]
+    },
+    "required_falsifiers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+      "minItems": 1,
+      "maxItems": 32
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_units", "tool_seconds", "wall_minutes"],
+      "properties": {
+        "token_units": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+        "tool_seconds": { "type": "integer", "minimum": 0, "maximum": 86400 },
+        "wall_minutes": { "type": "integer", "minimum": 1, "maximum": 1440 }
+      }
+    },
+    "parent_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "duplicate_candidate_ids": {
+      "$ref": "common.schema.json#/$defs/ReferenceList"
+    },
+    "status": { "$ref": "common.schema.json#/$defs/HypothesisStatus" },
+    "evidence_grade": { "$ref": "common.schema.json#/$defs/EvidenceGrade" },
+    "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "transition_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "event_id", "actor", "at", "evidence_ids"],
+        "properties": {
+          "from": {
+            "oneOf": [
+              { "$ref": "common.schema.json#/$defs/HypothesisStatus" },
+              { "type": "null" }
+            ]
+          },
+          "to": { "$ref": "common.schema.json#/$defs/HypothesisStatus" },
+          "event_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "actor": { "$ref": "actor.schema.json" },
+          "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+          "evidence_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 128
+    },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

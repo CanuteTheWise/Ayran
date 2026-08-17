@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/graph-query-result.schema.json",
+  "title": "GraphQueryResult",
+  "description": "Canonical provenance-preserving graph query receipt and row-order-independent digest.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "query_api_version",
+    "query_id",
+    "created_at",
+    "stream",
+    "query_name",
+    "canonical_params",
+    "snapshot",
+    "records",
+    "truncated",
+    "index_degraded",
+    "query_digest"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "query_api_version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "query_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "stream": { "$ref": "common.schema.json#/$defs/GraphStreamIdentity" },
+    "query_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$",
+      "maxLength": 128
+    },
+    "canonical_params": { "type": "object" },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "as_of_seq",
+        "event_hash",
+        "projection_schema_version",
+        "migration_version"
+      ],
+      "properties": {
+        "as_of_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "event_hash": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/Hash" },
+            { "type": "null" }
+          ]
+        },
+        "projection_schema_version": {
+          "$ref": "common.schema.json#/$defs/SemVer"
+        },
+        "migration_version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": { "type": "object" },
+      "maxItems": 100000
+    },
+    "truncated": { "type": "boolean" },
+    "index_degraded": { "type": "boolean" },
+    "query_digest": { "$ref": "common.schema.json#/$defs/Hash" }
+  }
+}

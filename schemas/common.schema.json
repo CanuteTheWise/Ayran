@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/common.schema.json",
+  "title": "Ayran Common Contract Definitions",
+  "description": "Canonical identifiers, enums, bounded values, and closed value containers shared by Ayran contracts.",
+  "x-ayran-schema-version": "1.0.0",
+  "$defs": {
+    "SchemaVersion": { "type": "string", "const": "1.0.0" },
+    "SemVer": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "RunId": { "type": "string", "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "TargetId": { "type": "string", "pattern": "^tgt_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "Hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "Timestamp": { "type": "string", "format": "date-time" },
+    "Uri": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "RelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$))(?!.*[\\u0000-\\u001f]).+$"
+    },
+    "Confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "TrustClass": {
+      "type": "string",
+      "enum": [
+        "deterministic_tool",
+        "runtime_observation",
+        "verified_source",
+        "target_source_claim",
+        "curated_external",
+        "human_asserted",
+        "adjudicated",
+        "model_observation",
+        "model_assumption"
+      ]
+    },
+    "EvidenceGrade": {
+      "type": "string",
+      "enum": ["lead", "supported", "observed", "defect_pinned", "validated"]
+    },
+    "GraphNamespace": {
+      "type": "string",
+      "enum": ["target", "global", "learning"]
+    },
+    "VersionedContractId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "TargetStreamIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "stream_id",
+        "run_id",
+        "target_identity",
+        "target_key"
+      ],
+      "properties": {
+        "namespace": { "const": "target" },
+        "stream_id": { "$ref": "#/$defs/Identifier" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "target_identity": { "$ref": "#/$defs/TargetIdentity" },
+        "target_key": { "$ref": "#/$defs/Hash" }
+      }
+    },
+    "GlobalStreamIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "stream_id",
+        "corpus_id",
+        "release_id",
+        "ontology_version",
+        "manifest_hash"
+      ],
+      "properties": {
+        "namespace": { "const": "global" },
+        "stream_id": { "$ref": "#/$defs/Identifier" },
+        "corpus_id": { "$ref": "#/$defs/Identifier" },
+        "release_id": { "$ref": "#/$defs/Identifier" },
+        "ontology_version": { "$ref": "#/$defs/SemVer" },
+        "manifest_hash": { "$ref": "#/$defs/Hash" }
+      }
+    },
+    "LearningStreamIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "stream_id",
+        "learning_id",
+        "origin_run_id",
+        "origin_target_key"
+      ],
+      "properties": {
+        "namespace": { "const": "learning" },
+        "stream_id": { "$ref": "#/$defs/Identifier" },
+        "learning_id": { "$ref": "#/$defs/Identifier" },
+        "origin_run_id": {
+          "oneOf": [{ "$ref": "#/$defs/RunId" }, { "type": "null" }]
+        },
+        "origin_target_key": {
+          "oneOf": [{ "$ref": "#/$defs/Hash" }, { "type": "null" }]
+        }
+      }
+    },
+    "GraphStreamIdentity": {
+      "oneOf": [
+        { "$ref": "#/$defs/TargetStreamIdentity" },
+        { "$ref": "#/$defs/GlobalStreamIdentity" },
+        { "$ref": "#/$defs/LearningStreamIdentity" }
+      ]
+    },
+    "HypothesisOrigin": {
+      "type": "string",
+      "enum": [
+        "model_novel",
+        "global_graph",
+        "contradiction",
+        "tool",
+        "coverage",
+        "specialist"
+      ]
+    },
+    "HypothesisStatus": {
+      "type": "string",
+      "enum": [
+        "lead",
+        "supported",
+        "poc_worthy",
+        "observed",
+        "defect_pinned",
+        "validated",
+        "falsified",
+        "needs_missing_fact",
+        "needs_reformulation",
+        "parked",
+        "duplicate_known_issue",
+        "reported"
+      ]
+    },
+    "EvidenceCeiling": {
+      "type": "string",
+      "enum": ["lead", "supported", "observed", "defect_pinned"]
+    },
+    "TargetIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_id", "source_tree_hash", "scope_id"],
+      "properties": {
+        "target_id": { "$ref": "#/$defs/TargetId" },
+        "source_tree_hash": { "$ref": "#/$defs/Hash" },
+        "scope_id": { "$ref": "#/$defs/Identifier" },
+        "commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "StringMapEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+        },
+        "value": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "TypedProperty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value_type", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "value_type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "identifier",
+            "hash"
+          ]
+        },
+        "value": { "type": ["string", "integer", "number", "boolean", "null"] }
+      }
+    },
+    "ReferenceList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Identifier" },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "HashList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Hash" },
+      "maxItems": 256,
+      "uniqueItems": true
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "identifier", "hash", "created_at"],
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/SchemaVersion" },
+    "identifier": { "$ref": "#/$defs/Identifier" },
+    "hash": { "$ref": "#/$defs/Hash" },
+    "created_at": { "$ref": "#/$defs/Timestamp" }
+  }
+}

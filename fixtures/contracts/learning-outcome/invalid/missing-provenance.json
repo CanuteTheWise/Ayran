@@ -1,0 +1,33 @@
+{
+  "adjudication": "Fixture outcome accepted",
+  "contamination_class": "development",
+  "created_at": "2026-08-12T12:00:00Z",
+  "generalized_candidate": null,
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:aa7349e3fb1cf78d7eec1444937ee87d1b6120475c137c966474c926194aebe4",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "learning_outcome_id": "lrn_01J00000000000000000000001",
+  "promotion_stage": "quarantined",
+  "result": "accepted",
+  "rights": {
+    "license_or_terms": "private",
+    "redistribution_allowed": false,
+    "reviewed": false
+  },
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "source_lineage": [
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  }
+}

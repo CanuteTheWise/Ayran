@@ -1,0 +1,13 @@
+record_type: method
+canonical_key: krait-kill-gates
+title: Kill gates for a payload approach
+summary: Three consecutive failures stop the same payload approach and force a pivot. They do not prove the class dead.
+applicability_predicates:
+  - experiment-retry
+questions:
+  - Which exact approach was killed, and which sibling paths remain?
+required_artifacts:
+  - payload-strike-record
+stop_conditions:
+  - concluding the surface is safe after a kill gate
+completeness: "0.8"

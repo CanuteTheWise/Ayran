@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/provenance.schema.json",
+  "title": "Ayran Provenance Record",
+  "description": "Source identity and transformation lineage; it contains no credentials or executable instructions.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance_id",
+    "source_uri",
+    "source_version",
+    "raw_hash",
+    "retrieved_at",
+    "license_or_terms",
+    "transformation_lineage"
+  ],
+  "properties": {
+    "provenance_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "source_uri": { "$ref": "common.schema.json#/$defs/Uri" },
+    "source_version": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "raw_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "retrieved_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "license_or_terms": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "extraction_locator": { "type": ["string", "null"], "maxLength": 512 },
+    "parser_version": {
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/SemVer" },
+        { "type": "null" }
+      ]
+    },
+    "transformation_lineage": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Hash" },
+      "maxItems": 64,
+      "uniqueItems": true
+    }
+  }
+}

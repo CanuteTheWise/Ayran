@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: nomad-2022
+title: Nomad bridge initialization replica
+summary: A zero root was treated as valid, so arbitrary messages authenticated.
+language: solidity
+protocol: bridge
+mechanism: bridge-validation
+root_cause: uninitialized-committed-root
+fix: Reject zero roots and require trusted initialization
+citation: solodit:curated:nomad-2022
+completeness: "0.8"

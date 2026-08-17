@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: beanstalk-2022
+title: Beanstalk flash-loan governance
+summary: Flash-loaned stake passed a proposal in the same transaction as the vote.
+language: solidity
+protocol: dao
+mechanism: governance-attack
+root_cause: same-transaction-flash-vote
+fix: Snapshot voting power before the proposal window
+citation: solodit:curated:beanstalk-2022
+completeness: "0.8"

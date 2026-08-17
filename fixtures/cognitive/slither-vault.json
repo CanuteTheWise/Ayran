@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "error": null,
+  "results": {
+    "detectors": [
+      {
+        "check": "arbitrary-send-eth",
+        "impact": "High",
+        "confidence": "High",
+        "description": "VulnerableVault.withdraw(uint256) (VulnerableVault.sol#16-22) sends eth to arbitrary user",
+        "elements": [
+          {
+            "type": "function",
+            "name": "withdraw",
+            "source_mapping": {
+              "start": 280,
+              "length": 200,
+              "filename_relative": "VulnerableVault.sol",
+              "lines": [16],
+              "starting_column": 5
+            }
+          }
+        ]
+      },
+      {
+        "check": "unprotected-upgrade",
+        "impact": "Medium",
+        "confidence": "Low",
+        "description": "VulnerableVault.setUnlock(uint256) (VulnerableVault.sol#24-26) is owner gated",
+        "elements": [
+          {
+            "type": "function",
+            "name": "setUnlock",
+            "source_mapping": {
+              "start": 500,
+              "length": 80,
+              "filename_relative": "VulnerableVault.sol",
+              "lines": [24],
+              "starting_column": 5
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

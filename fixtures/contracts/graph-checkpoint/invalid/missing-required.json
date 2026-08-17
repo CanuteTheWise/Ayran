@@ -1,0 +1,36 @@
+{
+  "artifact_manifest_hash": null,
+  "checkpoint_id": "chk_01J00000000000000000000001",
+  "config_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "created_at": "2026-08-12T12:00:00Z",
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:c323a530e9590d7184a632365dd1833b08899ab34eec2a4eb48c6b185478fa38",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "journal_commit_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "journal_cursor": 1,
+  "journal_event_hash": "sha256:a3aa3d716159905e183ff846c2bcbccb4a48a71a49bbfd772cc65d49f8b0bc94",
+  "migration_version": 1,
+  "outbox_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "projection_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "projection_schema_version": "1.0.0",
+  "source_hash": null,
+  "stream": {
+    "namespace": "target",
+    "run_id": "run_01J00000000000000000000001",
+    "stream_id": "str_01J00000000000000000000001",
+    "target_identity": {
+      "commit": "1111111111111111111111111111111111111111",
+      "scope_id": "scp_01J00000000000000000000001",
+      "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "target_id": "tgt_01J00000000000000000000001"
+    },
+    "target_key": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "target_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "tool_hash": null
+}

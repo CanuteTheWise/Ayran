@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/context-pack.schema.json",
+  "title": "ContextPack",
+  "description": "Bounded, freshness-pinned context with policy, trusted facts, hypotheses, historical references, untrusted data, and explicit exclusions kept separate.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "context_pack_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "purpose",
+    "role",
+    "graph_cursor",
+    "query_ids",
+    "included_object_ids",
+    "included_evidence_ids",
+    "excluded_object_ids",
+    "omitted_counts",
+    "token_estimate",
+    "policy_checksum",
+    "config_checksum",
+    "based_on_event_hash",
+    "fresh_until_event",
+    "knowledge_policy",
+    "sections",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "context_pack_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "purpose": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "role": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "graph_cursor": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "query_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "included_object_ids": {
+      "$ref": "common.schema.json#/$defs/ReferenceList"
+    },
+    "included_evidence_ids": {
+      "$ref": "common.schema.json#/$defs/ReferenceList"
+    },
+    "excluded_object_ids": {
+      "$ref": "common.schema.json#/$defs/ReferenceList"
+    },
+    "omitted_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "global", "learning"],
+      "properties": {
+        "target": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "global": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "learning": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "token_estimate": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "policy_checksum": { "$ref": "common.schema.json#/$defs/Hash" },
+    "config_checksum": { "$ref": "common.schema.json#/$defs/Hash" },
+    "based_on_event_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "fresh_until_event": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Identifier" },
+        { "type": "null" }
+      ]
+    },
+    "knowledge_policy": {
+      "type": "string",
+      "enum": ["target_only", "knowledge_blind", "graph_aware"]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["classification", "title", "content", "source_ids"],
+        "properties": {
+          "classification": {
+            "type": "string",
+            "enum": [
+              "POLICY",
+              "DETERMINISTIC_FACT",
+              "RUNTIME_OBSERVATION",
+              "SOURCE_CLAIM",
+              "ASSUMPTION",
+              "HYPOTHESIS",
+              "HISTORICAL_REFERENCE",
+              "COUNTEREVIDENCE",
+              "UNTRUSTED_DATA"
+            ]
+          },
+          "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "content": { "type": "string", "minLength": 1, "maxLength": 16384 },
+          "source_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 128
+    },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

@@ -1,0 +1,22 @@
+record_type: incident
+canonical_key: the-dao-2016
+title: The DAO reentrancy 2016
+summary: Recursive splitDAO drained ETH because balances were updated after the external call.
+language: solidity
+protocol: dao
+component: governance
+mechanism: reentrancy
+root_cause: external-call-before-balance-update
+symptoms:
+  - unexpected recursive withdrawals
+attack_path:
+  - call splitDAO
+  - reenter before balance write
+fix: Checks-effects-interactions and pull payments
+impact: approximately 3.6 million ETH
+affected_protocols:
+  - TheDAO
+citation: solodit:curated:the-dao-2016
+completeness: "0.9"
+urls:
+  - https://ethereum.org

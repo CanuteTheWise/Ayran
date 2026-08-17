@@ -1,0 +1,13 @@
+record_type: method
+canonical_key: krait-falsification
+title: Baseline, defect-removal, and fix falsification
+summary: A PoC must fail after the hypothesized defect is removed and the intended feature must still work.
+applicability_predicates:
+  - observed-poc
+questions:
+  - Does a one-line defect removal kill the profit while preserving the happy path?
+required_artifacts:
+  - mutation-diff
+stop_conditions:
+  - accepting a PoC that still passes after defect removal
+completeness: "0.9"

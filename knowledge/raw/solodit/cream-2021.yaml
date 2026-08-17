@@ -1,0 +1,12 @@
+record_type: incident
+canonical_key: cream-2021
+title: Cream Finance reentrancy via ERC777
+summary: A callback during transfer allowed recursive borrow against inflated collateral.
+language: solidity
+protocol: defi-lending
+component: lending
+mechanism: reentrancy
+root_cause: untrusted-token-callback
+fix: Checks-effects and token allowlists
+citation: solodit:curated:cream-2021
+completeness: "0.8"

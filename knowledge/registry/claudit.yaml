@@ -1,0 +1,21 @@
+source_id: claudit
+display_name: Claudit
+source_type: repository
+origin: https://github.com/cyfrin/claudit
+pin:
+  commit: ""
+  tag: ""
+  archive_sha256: ""
+license:
+  spdx_id: NOASSERTION
+  attribution_required: true
+  local_use: true
+  redistribution: false
+  retention_constraint: none
+trust_tier: curated_external
+reproduction_status: unverified
+contamination_flags: []
+contamination_registry: production
+phase: deferred
+authors: []
+notes: Listed in blueprint section 6. No M7 runtime route. Catalogued or deferred only.

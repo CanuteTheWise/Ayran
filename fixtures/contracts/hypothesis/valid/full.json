@@ -1,0 +1,94 @@
+{
+  "attack_path": [
+    "donate assets",
+    "mint mispriced shares"
+  ],
+  "budget": {
+    "token_units": 5000,
+    "tool_seconds": 600,
+    "wall_minutes": 30
+  },
+  "claim": "Direct donation may desynchronize cached assets.",
+  "confidence": 0.8,
+  "created_at": "2026-08-12T12:00:00Z",
+  "duplicate_candidate_ids": [
+    "hyp_01J00000000000000000000003"
+  ],
+  "evidence_grade": "supported",
+  "hypothesis_id": "hyp_01J00000000000000000000001",
+  "impact_premise": {
+    "description": "Share dilution may transfer value",
+    "kind": "asset_theft",
+    "upper_bound": null
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:08935e764e3e7f4885e0b87e72b8014c1d2b33fe8af55bb97b18ac9119a2b353",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "invariant_ids": [
+    "inv_01J00000000000000000000001"
+  ],
+  "novelty": "variant",
+  "origin": "contradiction",
+  "parent_ids": [
+    "hyp_01J00000000000000000000002"
+  ],
+  "preconditions": [
+    {
+      "attacker_can_create": true,
+      "description": "Attacker can transfer assets directly",
+      "status": "observed"
+    }
+  ],
+  "priors": [
+    {
+      "confidence": 0.4,
+      "source": "model"
+    }
+  ],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "required_falsifiers": [
+    "Direct transfer does not change pricing"
+  ],
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "status": "supported",
+  "target_entities": [
+    "nod_01J00000000000000000000001"
+  ],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "transition_history": [
+    {
+      "actor": {
+        "id": "reasoner",
+        "kind": "model",
+        "version": "1.0.0"
+      },
+      "at": "2026-08-12T12:00:00Z",
+      "event_id": "evt_01J00000000000000000000001",
+      "evidence_ids": [],
+      "from": null,
+      "to": "lead"
+    }
+  ],
+  "trust_class": "runtime_observation"
+}

@@ -1,0 +1,8 @@
+{
+  "algorithm": "sha256",
+  "canonicalization": "rfc8785",
+  "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "excluded_fields": [
+    "integrity.content_hash"
+  ]
+}

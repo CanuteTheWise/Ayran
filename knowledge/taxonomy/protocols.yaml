@@ -1,0 +1,27 @@
+version: 1.0.0
+family: protocols
+entries:
+  - id: defi-lending
+    title: DeFi lending
+    aliases: [aave, compound, morpho]
+    chains: [evm]
+  - id: defi-amm
+    title: DeFi AMM
+    aliases: [uniswap, curve, balancer]
+    chains: [evm]
+  - id: defi-vault
+    title: DeFi vault
+    aliases: [yearn, erc4626]
+    chains: [evm]
+  - id: nft
+    title: NFT
+    aliases: [marketplace]
+    chains: [evm]
+  - id: dao
+    title: DAO
+    aliases: [governor]
+    chains: [evm]
+  - id: bridge
+    title: Bridge
+    aliases: [canonical-bridge, messaging]
+    chains: [evm]

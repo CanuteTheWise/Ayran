@@ -1,0 +1,25 @@
+{
+  "rlmMaxDepth": 1,
+  "ayran": {
+    "sidecarSocketPath": "",
+    "runId": "",
+    "tokenFile": "",
+    "contextPackTokenBudget": 4000,
+    "enabledHooks": [
+      "session_start",
+      "resources_discover",
+      "before_agent_start",
+      "context",
+      "tool_call",
+      "tool_result",
+      "message_end",
+      "session_before_compact",
+      "session_compact",
+      "session_before_switch",
+      "session_before_fork",
+      "session_shutdown"
+    ],
+    "telemetryVerbosity": "info",
+    "shutdownTimeoutMs": 5000
+  }
+}

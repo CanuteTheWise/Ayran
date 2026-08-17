@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "error": null,
+  "results": {
+    "detectors": [
+      {
+        "check": "reentrancy-benign",
+        "impact": "High",
+        "confidence": "Medium",
+        "description": "Reentrancy in ViewReentrancy.peek() (ViewReentrancy.sol#8-12). The function is view and cannot mutate state.",
+        "elements": [
+          {
+            "type": "function",
+            "name": "peek",
+            "source_mapping": {
+              "start": 120,
+              "length": 80,
+              "filename_relative": "ViewReentrancy.sol",
+              "lines": [8],
+              "starting_column": 5
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

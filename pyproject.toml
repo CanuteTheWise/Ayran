@@ -1,0 +1,47 @@
+[project]
+name = "ayran-m1-workspace"
+version = "0.7.0"
+description = "Ayran contract generation and canonical Graph Fabric workspace"
+requires-python = ">=3.11,<3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "datamodel-code-generator==0.72.3",
+  "hypothesis==6.165.3",
+  "mypy==2.3.0",
+  "pytest==9.1.1",
+  "ruff==0.16.2",
+  "types-jsonschema==4.26.0.20260518",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["skills/ayran"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests/python"]
+markers = [
+  "wsl_ext4: requires an explicitly selected WSL ext4 validation root",
+  "resilience: exercises crash and corruption recovery boundaries",
+  "slow: separately selectable performance or long-running acceptance test",
+  "e2e: end-to-end audit scenarios",
+  "evaluation: sealed A0-A7 evaluation controller",
+  "distribution: Layer/Complete packaging and install",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["scripts", "skills/ayran/src", "tests/python"]

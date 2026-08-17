@@ -1,0 +1,35 @@
+version: 1.0.0
+family: attack_surfaces
+entries:
+  - id: proxy
+    title: Proxy and upgrades
+    aliases: [uups, transparent, beacon]
+    patterns: [storage-collision, access-control, initializer]
+  - id: vault
+    title: Vault
+    aliases: [erc4626, share-token]
+    patterns: [reentrancy, accounting-desync, inflation-attack]
+  - id: amm
+    title: AMM
+    aliases: [pool, swap, uniswap]
+    patterns: [oracle-manipulation, flash-loan, rounding]
+  - id: lending
+    title: Lending
+    aliases: [borrow, collateral, liquidation]
+    patterns: [oracle-manipulation, flash-loan, access-control]
+  - id: bridge
+    title: Bridge
+    aliases: [lock-mint, message-passing]
+    patterns: [bridge-validation, signature-replay]
+  - id: governance
+    title: Governance
+    aliases: [dao, governor, timelock]
+    patterns: [governance-attack, access-control]
+  - id: staking
+    title: Staking and rewards
+    aliases: [farm, gauge]
+    patterns: [accounting-desync, reentrancy]
+  - id: nft
+    title: NFT
+    aliases: [erc721, erc1155]
+    patterns: [reentrancy, access-control]

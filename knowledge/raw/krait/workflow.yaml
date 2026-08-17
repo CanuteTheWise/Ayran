@@ -1,0 +1,13 @@
+record_type: method
+canonical_key: krait-per-contract-workflow
+title: Per-contract and rescan workflow
+summary: Finish one contract's map-hunt cycle, then rescan after source identity changes. Never run the upstream scheduler.
+applicability_predicates:
+  - multi-contract-target
+questions:
+  - Which contract is in the current workset and what changed since the last scan?
+required_artifacts:
+  - source-identity
+stop_conditions:
+  - rescanning without a source-hash change
+completeness: "0.6"

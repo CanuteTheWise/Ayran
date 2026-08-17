@@ -1,0 +1,26 @@
+record_type: mechanism
+canonical_key: storage-collision
+title: Inherited storage collision
+summary: A new parent state variable shifts child slots and can overwrite proxy-critical data.
+language: solidity
+component: proxy
+mechanism: storage-collision
+invariant: Existing live slots remain at their deployed offsets across upgrades.
+preconditions:
+  - upgradeable-proxy
+  - inherited-storage
+attacker_capability: upgrade-admin or malicious implementation
+attack_steps:
+  - Deploy a new implementation that inserts a parent variable
+  - Overwrite owner or implementation slot
+impact: Unauthorized upgrade or fund seizure
+fix: Use namespaced storage or append-only gaps with layout tests
+code_signals:
+  - contract Foo is Bar
+  - uint256[50] private __gap
+applicability_predicates:
+  - upgradeable-proxy
+  - inherited-storage
+false_positive_conditions:
+  - unused trailing gap without parent insert
+completeness: "0.8"

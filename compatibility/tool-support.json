@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "milestone": "M9",
+  "policy": "external-detect-and-health-check-only",
+  "tools": [
+    {"id": "foundry", "expected_version": "1.7.1", "observed_version": "1.7.1", "observed_environment": "Ubuntu-WSL2", "ownership": "external", "path_portable": false, "m0_actions": ["detect", "version-check"], "forbidden_actions": ["copy", "install", "upgrade", "overwrite", "remove"]},
+    {"id": "slither", "expected_version": "0.11.5", "observed_version": "0.11.5", "observed_environment": "Ubuntu-WSL2", "ownership": "external", "path_portable": false, "m0_actions": ["detect", "version-check"], "forbidden_actions": ["copy", "install", "upgrade", "overwrite", "remove"]},
+    {"id": "solc", "expected_version": "0.8.28", "observed_version": "0.8.28+commit.7893614a", "observed_environment": "Ubuntu-WSL2", "ownership": "external", "path_portable": false, "m0_actions": ["detect", "version-check"], "forbidden_actions": ["copy", "install", "upgrade", "overwrite", "remove"]}
+  ],
+  "adapters_implemented": true,
+  "note": "M4 adapters detect, health-check, invoke, and parse. M8 adds Fizz and experimental Echidna/Medusa/Halmos/ItyFuzz manifests, all disabled by default. M9 does not enable them. Adapters never copy, install, upgrade, or remove the user's tools."
+}

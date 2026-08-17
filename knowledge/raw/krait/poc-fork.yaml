@@ -1,0 +1,15 @@
+record_type: method
+canonical_key: krait-poc-fork
+title: PoC and fork methods
+summary: Recreate techniques in the run workspace. Never execute retrieved exploit code. Fork tests are evidence only after clean replay.
+applicability_predicates:
+  - poc-worthy
+questions:
+  - Can the PoC be replayed from a pinned fork block with numerical assertions?
+required_artifacts:
+  - foundry-test
+stop_conditions:
+  - running retrieved bytecode
+  - broadcasting transactions
+safe_for_execution: false
+completeness: "0.8"

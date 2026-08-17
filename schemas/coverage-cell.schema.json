@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/coverage-cell.schema.json",
+  "title": "CoverageCell",
+  "description": "Exact examined security dimension and remaining gaps; it cannot assert that an entire surface is safe.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "coverage_cell_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "dimension",
+    "target_refs",
+    "invariant_ids",
+    "entry_point_ids",
+    "attempted_origins",
+    "attempted_tools",
+    "depth",
+    "achieved_evidence_grade",
+    "status",
+    "examined_result",
+    "gaps",
+    "blockers",
+    "untried_dimensions",
+    "updated_at",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "coverage_cell_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "dimension": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "target_refs": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "invariant_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "entry_point_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "attempted_origins": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/HypothesisOrigin" },
+      "maxItems": 6,
+      "uniqueItems": true
+    },
+    "attempted_tools": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "depth": {
+      "type": "string",
+      "enum": ["inventory", "reviewed", "tested", "falsified", "blocked"]
+    },
+    "achieved_evidence_grade": {
+      "$ref": "common.schema.json#/$defs/EvidenceGrade"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "examined", "blocked", "accepted_residual_risk"]
+    },
+    "examined_result": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "not": {
+        "pattern": "^(?:safe|clean|no vulnerability|no vulnerabilities)$"
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+      "maxItems": 64
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+      "maxItems": 64
+    },
+    "untried_dimensions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+      "maxItems": 64
+    },
+    "updated_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

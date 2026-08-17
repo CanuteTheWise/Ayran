@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/tool-run.schema.json",
+  "title": "ToolRun",
+  "description": "Bounded, sanitized tool execution record. Exit code is distinct from parsed evidence semantics.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool_run_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "capability_id",
+    "capability_version",
+    "adapter_version",
+    "tool_name",
+    "tool_version",
+    "argv",
+    "environment",
+    "working_root",
+    "input_hashes",
+    "seed",
+    "fork_identity_hash",
+    "limits",
+    "started_at",
+    "ended_at",
+    "exit_code",
+    "signal",
+    "stdout_hash",
+    "stderr_hash",
+    "artifact_refs",
+    "parse_status",
+    "parser_version",
+    "normalized_evidence_ids",
+    "evidence_ceiling",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "tool_run_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "capability_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "capability_version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "adapter_version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "tool_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "tool_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "argv": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 512 },
+      "minItems": 1,
+      "maxItems": 128
+    },
+    "environment": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/StringMapEntry" },
+      "maxItems": 64
+    },
+    "working_root": { "$ref": "common.schema.json#/$defs/RelativePath" },
+    "input_hashes": { "$ref": "common.schema.json#/$defs/HashList" },
+    "seed": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "fork_identity_hash": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Hash" },
+        { "type": "null" }
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory_mib", "disk_mib", "wall_seconds", "network"],
+      "properties": {
+        "cpu": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "memory_mib": { "type": "integer", "minimum": 64, "maximum": 131072 },
+        "disk_mib": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "wall_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "network": {
+          "type": "string",
+          "enum": [
+            "none",
+            "approved-api",
+            "rpc-allowlist",
+            "approved-source-fetch"
+          ]
+        }
+      }
+    },
+    "started_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "ended_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "exit_code": {
+      "type": ["integer", "null"],
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "signal": { "type": ["string", "null"], "maxLength": 64 },
+    "stdout_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "stderr_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "artifact_refs": { "$ref": "common.schema.json#/$defs/HashList" },
+    "parse_status": {
+      "type": "string",
+      "enum": ["parsed", "partial", "failed", "parser_drift"]
+    },
+    "parser_version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "normalized_evidence_ids": {
+      "$ref": "common.schema.json#/$defs/ReferenceList"
+    },
+    "evidence_ceiling": { "$ref": "common.schema.json#/$defs/EvidenceCeiling" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

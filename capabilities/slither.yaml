@@ -1,0 +1,86 @@
+schema_version: 1.0.0
+capability_id: cap_01J4S1TH000000000000000001
+created_at: "2026-08-13T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - slither
+  phases:
+    - mapping
+    - discovery
+triggers:
+  - slither.analyze
+questions_answered:
+  - which_static_alerts_exist
+  - where_are_the_source_spans
+prerequisites:
+  - slither
+detect:
+  argv:
+    - slither
+    - "--version"
+  parser: slither_version_v1
+health_check:
+  method: slither_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "SlitherRunRequest@1.0.0"
+output_schema: "SlitherRunResult@1.0.0"
+invocation:
+  argv_template:
+    - slither
+    - "--json"
+    - "{output_file}"
+    - "{source_paths}"
+  shell: false
+evidence_ceiling: lead
+resources:
+  cpu: 2
+  memory_mib: 2048
+  disk_mib: 512
+  network: none
+sandbox_profile: evm-static
+secret_aliases: []
+timeout_seconds: 300
+retry:
+  transient: 0
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - compile
+  - parser_drift
+  - timeout
+  - oom
+fallbacks: []
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-13
+provenance:
+  - provenance_id: prv_01J4S1TH000000000000000001
+    source_uri: "https://ayran.dev/capabilities/slither.analyze"
+    source_version: 0.11.5
+    raw_hash: "sha256:73239f0718f76d5e368f3aa49dfbaf12aeb816dda554ba1263ffb6c2fc4fc4b0"
+    retrieved_at: "2026-08-13T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:d79f1005df615c229d57f8d16a76b8e48734182a874663a15f0ed5222a2ab679"
+  excluded_fields:
+    - integrity.content_hash

@@ -1,0 +1,72 @@
+{
+  "artifact_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "confidence": 1.0,
+  "config_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "created_at": "2026-08-12T12:00:00Z",
+  "evidence_grade": "observed",
+  "evidence_id": "evd_01J00000000000000000000001",
+  "fork_identity_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+  "input_hashes": [
+    "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:a1f14961aa8fb5bc3d97e935ecc083500f5c97d64e471e840d6a3ead6d13acbd",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "mime_type": "application/json",
+  "normalized_locator": "run/artifacts/normalized.json",
+  "producer": {
+    "id": "foundry",
+    "kind": "tool",
+    "version": "1.0.0"
+  },
+  "producer_version": "1.0.0",
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "raw_locator": "run/artifacts/raw.json",
+  "redaction": {
+    "profile": "default",
+    "redacted": false,
+    "secret_scan_passed": true
+  },
+  "refutes": [
+    "hyp_01J00000000000000000000002"
+  ],
+  "reproduction": {
+    "argv": [
+      "forge",
+      "test",
+      "--match-test",
+      "testDonation"
+    ],
+    "environment_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "expected_result_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "working_root": "run/work"
+  },
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "size_bytes": 100,
+  "supports": [
+    "hyp_01J00000000000000000000001"
+  ],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "trust_class": "runtime_observation"
+}

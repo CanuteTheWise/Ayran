@@ -1,0 +1,19 @@
+record_type: reasoning_lens
+canonical_key: lens-liquidation-solvency
+title: Liquidation and solvency lens
+summary: Check health-factor math, bad-debt socialization, and self-liquidation incentives.
+language: solidity
+protocol: defi-lending
+applicability_predicates:
+  - collateral
+  - liquidation
+questions:
+  - What remains solvent if the oracle moves one tick?
+required_artifacts:
+  - oracle-map
+  - liquidation-path
+stop_conditions:
+  - claiming insolvency without a numeric bound
+false_positive_traps:
+  - Liquidations that require an already-unhealthy position
+completeness: "0.8"

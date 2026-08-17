@@ -1,0 +1,21 @@
+record_type: specialist_skill
+canonical_key: test-suite-analysis
+title: Test-suite analysis specialist
+summary: Use the target test suite as a locator for invariants and untested branches, never as proof.
+role_description: Reads Foundry or Hardhat tests to list claimed invariants and coverage gaps.
+language: solidity
+applicability_predicates:
+  - foundry-tests-present
+  - invariant-tests-present
+non_applicability: []
+questions:
+  - Which invariants are asserted versus only commented?
+required_artifacts:
+  - test-tree
+  - coverage-summary
+stop_conditions:
+  - treating a passing test as evidence the surface is safe
+false_positive_traps:
+  - Tests that mock privileged callers and cannot bound production auth
+knowledge_policy: target_only
+token_budget: 900

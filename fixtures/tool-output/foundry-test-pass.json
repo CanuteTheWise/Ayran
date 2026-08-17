@@ -1,0 +1,18 @@
+{
+  "duration": {"secs": 0, "nanos": 1200000},
+  "test_results": {
+    "test/Counter.t.sol:CounterTest": {
+      "testPass()": {
+        "status": "Success",
+        "reason": null,
+        "counterexample": null,
+        "decoded_logs": [],
+        "kind": {"Standard": 21421},
+        "traces": [],
+        "labeled_addresses": {},
+        "duration": {"secs": 0, "nanos": 400000},
+        "gas": 21421
+      }
+    }
+  }
+}

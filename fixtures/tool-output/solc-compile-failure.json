@@ -1,0 +1,5 @@
+Error: Source "Bad.sol": ParserError: Expected pragma, import directive or contract/library/interface definition.
+ --> Bad.sol:1:1:
+  |
+1 | this is not solidity
+  | ^^^^

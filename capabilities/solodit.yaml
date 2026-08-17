@@ -1,0 +1,85 @@
+schema_version: 1.0.0
+capability_id: cap_01J4S0DT000000000000000001
+created_at: "2026-08-13T00:00:00Z"
+version: 1.0.0
+kind: http_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks: []
+  phases:
+    - discovery
+    - dedup
+    - reporting
+triggers:
+  - solodit.search
+questions_answered:
+  - are_there_historical_precedents
+  - what_is_the_citation_for_a_known_issue
+prerequisites:
+  - solodit_endpoint
+detect:
+  argv:
+    - solodit
+    - health
+  parser: solodit_health_v1
+health_check:
+  method: http_health_check
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "SoloditSearchRequest@1.0.0"
+output_schema: "SoloditSearchResult@1.0.0"
+invocation:
+  argv_template:
+    - solodit
+    - search
+    - "{query}"
+  shell: false
+evidence_ceiling: lead
+resources:
+  cpu: 1
+  memory_mib: 256
+  disk_mib: 64
+  network: approved-api
+sandbox_profile: evm-knowledge
+secret_aliases:
+  - AYRAN_SOLODIT_SECRET_REF
+timeout_seconds: 30
+retry:
+  transient: 1
+  deterministic: 0
+cooldown:
+  consecutive_failures: 3
+  scope: run
+failure_taxonomy:
+  - network
+  - parser_drift
+  - timeout
+  - policy
+fallbacks: []
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-13
+provenance:
+  - provenance_id: prv_01J4S0DT000000000000000001
+    source_uri: "https://ayran.dev/capabilities/solodit.search"
+    source_version: api-v1
+    raw_hash: "sha256:3d8516ec37a03dd8c8c7ddfd7d57b0a0622ad36c693211bc1ff2dd90713274b2"
+    retrieved_at: "2026-08-13T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:17d03e4ac96a2d0eeba33026686a93f9ae1bb0ee8a5b17a297463c6147becf81"
+  excluded_fields:
+    - integrity.content_hash

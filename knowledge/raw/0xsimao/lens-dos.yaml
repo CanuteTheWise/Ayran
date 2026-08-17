@@ -1,0 +1,17 @@
+record_type: reasoning_lens
+canonical_key: lens-dos
+title: Denial of service lens
+summary: Unbounded loops, griefable external calls, and griefing of keepers or liquidators.
+language: solidity
+applicability_predicates:
+  - unbounded-loop
+  - keeper-needed
+questions:
+  - Can a user make a required keeper transaction exceed the block gas limit?
+required_artifacts:
+  - loop-bounds
+stop_conditions:
+  - DoS without a required protocol function
+false_positive_traps:
+  - Pagination or pull-payment already present
+completeness: "0.7"

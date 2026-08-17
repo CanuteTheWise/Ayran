@@ -1,0 +1,12 @@
+record_type: false_positive_trap
+canonical_key: view-reentrancy-guarded
+title: View function after CEI is not exploitable reentrancy
+hard_negative: true
+mechanism: reentrancy
+language: solidity
+why_safe: State is updated before the external call and the callback can only read the already-zeroed balance.
+distinction: The dangerous variant credits the caller after the untrusted call.
+safe_variant_code: "balances[msg.sender]=0; (bool ok,)=msg.sender.call{value: amount}(\"\"); require(ok);"
+applicability_predicates:
+  - external-call-before-state
+summary: Hard negative for naive reentrancy greps that match any call.

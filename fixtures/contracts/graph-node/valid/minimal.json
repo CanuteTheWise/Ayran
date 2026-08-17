@@ -1,0 +1,36 @@
+{
+  "confidence": 1.0,
+  "created_at": "2026-08-12T12:00:00Z",
+  "evidence_grade": "lead",
+  "evidence_refs": [],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:eb71d847a32e2f198dd177ceb5be51f88996870b680a691c13b2e7d8bfd6afc9",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "namespace": "target",
+  "node_id": "nod_01J00000000000000000000001",
+  "node_type": "Contract",
+  "properties": [],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "revision": 1,
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "source_locator": "target/src/Vault.sol:1",
+  "status": "active",
+  "trust_class": "deterministic_tool",
+  "valid_from_event": "evt_01J00000000000000000000001"
+}

@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: poly-network-2021
+title: Poly Network keeper key
+summary: A keepers role could replace the authenticating contract and mint on the destination chain.
+language: solidity
+protocol: bridge
+mechanism: access-control
+root_cause: overprivileged-keeper
+fix: Split mint authority from upgrade authority
+citation: solodit:curated:poly-network-2021
+completeness: "0.7"

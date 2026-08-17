@@ -1,0 +1,15 @@
+record_type: false_positive_trap
+canonical_key: storage-gap-unused
+title: Unused storage gap is not a collision
+hard_negative: true
+mechanism: storage-collision
+language: solidity
+component: proxy
+why_safe: A trailing uint256[50] gap that is never read cannot collide with a new variable appended after it in the same contract.
+distinction: The dangerous pattern inserts a new inherited variable before existing storage, shifting live slots.
+safe_variant_code: "uint256 public x; uint256[49] private __gap;"
+false_positive_conditions:
+  - gap-present-without-parent-insert
+applicability_predicates:
+  - upgradeable-proxy
+summary: Hard negative for storage-layout pattern matching.

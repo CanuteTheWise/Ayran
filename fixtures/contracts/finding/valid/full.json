@@ -1,0 +1,82 @@
+{
+  "affected_code": [
+    "target/src/Vault.sol:10"
+  ],
+  "attacker_model": "Unprivileged user with underlying assets",
+  "confidence": 0.8,
+  "created_at": "2026-08-12T12:00:00Z",
+  "defect_fix_evidence_ids": [
+    "evd_01J00000000000000000000003"
+  ],
+  "duplicate_disposition": {
+    "comparison": "No matching known issue",
+    "source_refs": [],
+    "status": "unique"
+  },
+  "evidence_ids": [
+    "evd_01J00000000000000000000001"
+  ],
+  "finding_id": "fnd_01J00000000000000000000001",
+  "gate_a_verdict_id": "dav_01J00000000000000000000001",
+  "gate_b_verdict_id": "dav_01J00000000000000000000002",
+  "impact": {
+    "assumptions": [
+      "market exists"
+    ],
+    "equation": "attacker_gain = victim_loss",
+    "kind": "theft",
+    "lower_bound": "0",
+    "upper_bound": null
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:64e1834f1f5d9fe42e2606c80e403a62e05d7c2056eab80df8a65811e92c459f",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "mitigations": [
+    "Include live balance in accounting"
+  ],
+  "negative_control_ids": [
+    "evd_01J00000000000000000000002"
+  ],
+  "preconditions": [
+    "Direct transfer is possible"
+  ],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "reproduction_artifact_id": "evd_01J00000000000000000000001",
+  "root_cause": "Cached assets omit direct transfers",
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "scope_manifest_id": "scp_01J00000000000000000000001",
+  "severity": {
+    "label": "high",
+    "policy_id": "pol_01J00000000000000000000001",
+    "rule_citation": "Loss of user assets"
+  },
+  "status": "validated",
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "title": "Donation may dilute vault shares",
+  "trust_class": "runtime_observation",
+  "uncertainty": [
+    "Exact deployed balance unknown"
+  ],
+  "violated_invariant": "Shares preserve proportional ownership"
+}

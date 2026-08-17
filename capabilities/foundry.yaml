@@ -1,0 +1,93 @@
+schema_version: 1.0.0
+capability_id: cap_01J4F0RG000000000000000001
+created_at: "2026-08-13T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - foundry
+  phases:
+    - mapping
+    - validation
+    - falsification
+triggers:
+  - foundry.test
+  - build.foundry
+questions_answered:
+  - does_behavior_reproduce
+  - does_fix_kill_behavior
+prerequisites:
+  - forge
+  - compatible_solc
+  - writable_run_copy
+detect:
+  argv:
+    - forge
+    - "--version"
+  parser: foundry_version_v1
+health_check:
+  method: foundry_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "FoundryRunRequest@1.0.0"
+output_schema: "FoundryRunResult@1.0.0"
+invocation:
+  argv_template:
+    - forge
+    - test
+    - "--json"
+  shell: false
+evidence_ceiling: observed
+resources:
+  cpu: 4
+  memory_mib: 3072
+  disk_mib: 4096
+  network: rpc-allowlist
+sandbox_profile: evm-validator
+secret_aliases:
+  - AYRAN_RPC_SECRET_REF
+timeout_seconds: 900
+retry:
+  transient: 1
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - compile
+  - test
+  - timeout
+  - oom
+  - rpc
+  - parser_drift
+fallbacks:
+  - foundry.local_minimal
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-13
+provenance:
+  - provenance_id: prv_01J4F0RG000000000000000001
+    source_uri: "https://ayran.dev/capabilities/foundry.test"
+    source_version: 1.7.1
+    raw_hash: "sha256:5434551746e7ae95352717b505364090c02c58a2a8c45696b9b265354096775e"
+    retrieved_at: "2026-08-13T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:ff5890730d3af50239c20c2156957d59c8d2fb99a50bb2f48b2a4cfa7e5504ae"
+  excluded_fields:
+    - integrity.content_hash

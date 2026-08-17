@@ -1,0 +1,49 @@
+{
+  "artifact_refs": [],
+  "assertion_id": "ast_01J00000000000000000000001",
+  "confidence": 1.0,
+  "contradiction_group": null,
+  "created_at": "2026-08-12T12:00:00Z",
+  "identity": {
+    "id": "tgt_01J00000000000000000000001",
+    "kind": "target",
+    "version_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:8f2b78944e5ab6482863b307cf6eebcb1e6c9e8cb0e48ff4d859ca637dd668c9",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "namespace": "target",
+  "object_kind": "identifier",
+  "object_value": "nod_01J00000000000000000000002",
+  "predicate": "has.asset.flow",
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "source_version": "fixture-v1",
+  "subject_id": "nod_01J00000000000000000000001",
+  "supersedes": [],
+  "trust_class": "deterministic_tool",
+  "unexpected_security_field": "reject",
+  "valid_from_event": "evt_01J00000000000000000000001",
+  "writer": {
+    "id": "ayran.fixture",
+    "kind": "service",
+    "version": "1.0.0"
+  },
+  "written_at": "2026-08-12T12:00:00Z"
+}

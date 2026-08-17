@@ -1,0 +1,6 @@
+{
+  "id": "ayran.fixture",
+  "independence_group": "fixture-independent",
+  "kind": "service",
+  "version": "1.0.0"
+}

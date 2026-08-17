@@ -1,0 +1,16 @@
+record_type: incident
+canonical_key: harvest-2020
+title: Harvest Finance flash-loan oracle
+summary: Curve virtual price was moved in-transaction and Harvest mint used the manipulated share price.
+language: solidity
+protocol: defi-vault
+component: vault
+mechanism: oracle-manipulation
+root_cause: same-block-spot-price
+attack_path:
+  - flash-loan
+  - distort-curve-virtual-price
+  - deposit-and-withdraw
+fix: TWAP or non-spot share pricing plus sandwich bounds
+citation: solodit:curated:harvest-2020
+completeness: "0.8"

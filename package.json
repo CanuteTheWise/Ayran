@@ -1,0 +1,66 @@
+{
+  "name": "@ayran/prime-package",
+  "version": "0.7.0",
+  "private": true,
+  "description": "Ayran Prime 0.7.2 package: canonical contracts, Graph Fabric, sidecar, and lifecycle bridge",
+  "type": "module",
+  "license": "UNLICENSED",
+  "keywords": [
+    "pi-package",
+    "ayran"
+  ],
+  "engines": {
+    "node": ">=22.8.0 <25"
+  },
+  "scripts": {
+    "generate:contracts": "python scripts/generate_contracts.py",
+    "check:generated": "python scripts/generate_contracts.py --check",
+    "test:contracts": "tsx --test tests/typescript/contracts.test.ts",
+    "test:extension": "tsx --test tests/typescript/extension.test.ts tests/typescript/package-discovery.test.ts",
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check package.json schemas prime/extension tests/typescript",
+    "test": "npm run check:generated && npm run typecheck && npm run test:contracts && npm run test:extension"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "canonicalize": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "json-schema-to-typescript": "15.0.4",
+    "prettier": "3.9.6",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "prime-agent": "0.7.2",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "prime-agent": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "pi": {
+    "extensions": [
+      "./prime/extension/index.ts"
+    ],
+    "skills": [
+      "./skills/ayran",
+      "./skills/specialists"
+    ],
+    "prompts": [
+      "./prime/prompts"
+    ]
+  },
+  "ayran": {
+    "milestone": "M9",
+    "runtimeImplemented": true,
+    "primeBoundary": "external-unmodified-peer",
+    "canonicalContracts": "schemas/contracts.schema.json"
+  }
+}

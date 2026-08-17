@@ -1,0 +1,23 @@
+record_type: specialist_skill
+canonical_key: uniswap-v4-hooks
+title: Uniswap v4 hooks specialist
+summary: Review hook permissions, before/after swap accounting, and delta settlement for v4 pools.
+role_description: Protocol specialist activated only when Uniswap v4 hook contracts are in scope.
+language: solidity
+protocol: defi-amm
+component: amm
+framework: uniswap-v4
+applicability_predicates:
+  - uniswap-v4-hooks
+  - pool-manager-present
+non_applicability:
+  - v2-or-v3-only-amm
+questions:
+  - Which hook permissions are granted versus actually implemented?
+required_artifacts:
+  - hook-permission-bitmap
+  - pool-manager-interface
+stop_conditions:
+  - treating a missing hook as a finding without a reachable callback
+knowledge_policy: graph_aware
+token_budget: 1000

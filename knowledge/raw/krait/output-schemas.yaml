@@ -1,0 +1,13 @@
+record_type: method
+canonical_key: krait-output-schemas
+title: Structured output schemas
+summary: Emit candidates, proofs, and critic notes as typed records, not free-form chat. Upstream scoreboards are not evidence.
+applicability_predicates:
+  - reporting
+questions:
+  - Does every claim resolve to an evidence ID or an explicit assumption?
+required_artifacts:
+  - finding-schema
+stop_conditions:
+  - exporting narrative without claim tags
+completeness: "0.7"

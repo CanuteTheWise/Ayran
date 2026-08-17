@@ -1,0 +1,13 @@
+record_type: method
+canonical_key: krait-impact-premise
+title: Impact premise before severity
+summary: Write attacker model, profit equation, and bounds before applying a contest severity table.
+applicability_predicates:
+  - poc-worthy-or-later
+questions:
+  - What is the numeric bound and which price/window assumptions does it need?
+required_artifacts:
+  - impact-record
+stop_conditions:
+  - severity without an impact premise
+completeness: "0.8"

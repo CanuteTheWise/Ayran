@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "lock_id": "ayran-platform-v1",
+  "canonical_host_project": {
+    "platform": "windows",
+    "path": null,
+    "path_resolution": "invocation-source-root",
+    "role": "authored-source-and-release-output",
+    "portable_install_target": false
+  },
+  "runtime": {
+    "first_supported_class": "linux-wsl2",
+    "native_windows": "unsupported-in-first-release",
+    "distribution_selection": "discover-at-execution-and-require-explicit-selection-when-ambiguous",
+    "hardcoded_distribution": null,
+    "hardcoded_user_home": null
+  },
+  "filesystem": {
+    "staging_and_active_state_required": "wsl-ext4",
+    "allowed_stage_filesystems": ["ext4"],
+    "forbidden_active_state_filesystems": ["drvfs", "9p", "virtiofs"],
+    "forbidden_active_state": ["sqlite", "wal", "journal", "unix-socket", "compiler-cache", "tool-output", "runtime-state", "secrets"],
+    "path_probe": ["realpath --", "findmnt -T <resolved-path> -n -o FSTYPE,SOURCE,TARGET"]
+  },
+  "minimum_resources": {
+    "logical_cpu": 4,
+    "memory_mib": 4096,
+    "swap_mib": 0,
+    "free_ext4_disk_mib": 8192,
+    "basis": "M0 engineering floor for dependency install, generation, and contract tests; later audit-tool profiles may require more."
+  },
+  "capability_probes": {
+    "container": {"preferred": "rootless-docker", "command": ["docker", "info", "--format", "{{json .SecurityOptions}}"], "m0_enforcement": "probe-only"},
+    "bubblewrap": {"command": ["bwrap", "--version"], "m0_enforcement": "probe-only"},
+    "wsl2": {"command": ["uname", "-r"], "required_pattern": "microsoft-standard-WSL2"}
+  },
+  "observed_environment": {
+    "distribution": "Ubuntu",
+    "kernel": "6.6.114.1-microsoft-standard-WSL2",
+    "architecture": "x86_64",
+    "root_filesystem": "ext4",
+    "home_filesystem": "ext4",
+    "logical_cpu": 12,
+    "memory_kib": 6067292,
+    "swap_kib": 4194304,
+    "node": "22.22.1",
+    "python": "3.14.4",
+    "uv": "0.11.21",
+    "docker": "29.6.1",
+    "bubblewrap": "0.11.1",
+    "observation_only_not_portable_default": true,
+    "observed_at": "2026-08-12T00:00:00Z"
+  },
+  "portability_rules": {
+    "forbid_usernames": true,
+    "forbid_absolute_home_paths": true,
+    "forbid_universal_distro_binding": true,
+    "install_locations_resolved_inside_selected_distribution": true
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0.0",
+  "canonicalization": "RFC 8785 JSON Canonicalization Scheme; SHA-256 over UTF-8 canonical bytes with integrity.content_hash removed and, for GraphEvent, event_hash removed",
+  "contracts": [
+    {
+      "name": "common",
+      "schema": "common.schema.json",
+      "python_model": "AyranCommonContractDefinitions"
+    },
+    {
+      "name": "actor",
+      "schema": "actor.schema.json",
+      "python_model": "AyranWriterAndActorIdentity"
+    },
+    {
+      "name": "provenance",
+      "schema": "provenance.schema.json",
+      "python_model": "AyranProvenanceRecord"
+    },
+    {
+      "name": "integrity",
+      "schema": "integrity.schema.json",
+      "python_model": "AyranIntegrityEnvelope"
+    },
+    {
+      "name": "graph-event",
+      "schema": "graph-event.schema.json",
+      "python_model": "GraphEvent"
+    },
+    {
+      "name": "graph-node",
+      "schema": "graph-node.schema.json",
+      "python_model": "GraphNode"
+    },
+    {
+      "name": "graph-edge",
+      "schema": "graph-edge.schema.json",
+      "python_model": "GraphEdge"
+    },
+    {
+      "name": "graph-assertion",
+      "schema": "graph-assertion.schema.json",
+      "python_model": "GraphAssertion"
+    },
+    {
+      "name": "journal-event",
+      "schema": "journal-event.schema.json",
+      "python_model": "JournalEvent"
+    },
+    {
+      "name": "journal-record",
+      "schema": "journal-record.schema.json",
+      "python_model": "JournalRecord"
+    },
+    {
+      "name": "graph-acknowledgement",
+      "schema": "graph-acknowledgement.schema.json",
+      "python_model": "GraphAcknowledgement"
+    },
+    {
+      "name": "graph-checkpoint",
+      "schema": "graph-checkpoint.schema.json",
+      "python_model": "GraphCheckpoint"
+    },
+    {
+      "name": "segment-manifest",
+      "schema": "segment-manifest.schema.json",
+      "python_model": "SegmentManifest"
+    },
+    {
+      "name": "graph-integrity-report",
+      "schema": "graph-integrity-report.schema.json",
+      "python_model": "GraphIntegrityReport"
+    },
+    {
+      "name": "graph-query-result",
+      "schema": "graph-query-result.schema.json",
+      "python_model": "GraphQueryResult"
+    },
+    {
+      "name": "capability-manifest",
+      "schema": "capability-manifest.schema.json",
+      "python_model": "CapabilityManifest"
+    },
+    {
+      "name": "scope-manifest",
+      "schema": "scope-manifest.schema.json",
+      "python_model": "ScopeManifest"
+    },
+    {
+      "name": "hypothesis",
+      "schema": "hypothesis.schema.json",
+      "python_model": "Hypothesis"
+    },
+    {
+      "name": "evidence-artifact",
+      "schema": "evidence-artifact.schema.json",
+      "python_model": "EvidenceArtifact"
+    },
+    {
+      "name": "tool-run",
+      "schema": "tool-run.schema.json",
+      "python_model": "ToolRun"
+    },
+    {
+      "name": "coverage-cell",
+      "schema": "coverage-cell.schema.json",
+      "python_model": "CoverageCell"
+    },
+    {
+      "name": "da-verdict",
+      "schema": "da-verdict.schema.json",
+      "python_model": "DAVerdict"
+    },
+    {
+      "name": "finding",
+      "schema": "finding.schema.json",
+      "python_model": "Finding"
+    },
+    {
+      "name": "learning-outcome",
+      "schema": "learning-outcome.schema.json",
+      "python_model": "LearningOutcome"
+    },
+    {
+      "name": "context-pack",
+      "schema": "context-pack.schema.json",
+      "python_model": "ContextPack"
+    },
+    {
+      "name": "router-action",
+      "schema": "router-action.schema.json",
+      "python_model": "RouterAction"
+    }
+  ]
+}

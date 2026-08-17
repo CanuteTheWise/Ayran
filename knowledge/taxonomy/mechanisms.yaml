@@ -1,0 +1,43 @@
+version: 1.0.0
+family: mechanisms
+entries:
+  - id: reentrancy
+    title: Reentrancy
+    aliases: [callback, cei, read-only-reentrancy]
+    applicability_predicates: [external-call-before-state, callback-to-untrusted]
+  - id: oracle-manipulation
+    title: Oracle manipulation
+    aliases: [spot-price, twap, flash-loan-oracle]
+    applicability_predicates: [price-from-pool, single-block-update]
+  - id: flash-loan
+    title: Flash loan
+    aliases: [atomic-liquidity, uncollateralized-borrow]
+    applicability_predicates: [same-tx-liquidity, donation-attack]
+  - id: access-control
+    title: Access control
+    aliases: [auth, onlyowner, role, tx-origin]
+    applicability_predicates: [privileged-function, missing-modifier]
+  - id: arithmetic-overflow
+    title: Arithmetic overflow
+    aliases: [unchecked, wrap, rounding]
+    applicability_predicates: [unchecked-block, accumulator]
+  - id: storage-collision
+    title: Storage collision
+    aliases: [proxy-gap, initializer, eip1967]
+    applicability_predicates: [upgradeable-proxy, inherited-storage]
+  - id: signature-replay
+    title: Signature replay
+    aliases: [eip712, nonce, missing-chainid]
+    applicability_predicates: [offchain-signature, missing-nonce]
+  - id: governance-attack
+    title: Governance attack
+    aliases: [flash-vote, proposal, timelock]
+    applicability_predicates: [token-voting, same-block-vote]
+  - id: bridge-validation
+    title: Bridge validation
+    aliases: [message-bridge, light-client, guardian]
+    applicability_predicates: [cross-chain-message, trusted-relayer]
+  - id: accounting-desync
+    title: Accounting desynchronization
+    aliases: [shares, exchange-rate, reserves, insolvency]
+    applicability_predicates: [share-token, virtual-offset]

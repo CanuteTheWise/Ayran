@@ -1,0 +1,19 @@
+record_type: reasoning_lens
+canonical_key: lens-cross-chain
+title: Cross-chain state lens
+summary: Treat destination balances as eventually consistent and name the finality assumption.
+language: solidity
+protocol: bridge
+mechanism: bridge-validation
+applicability_predicates:
+  - cross-chain-message
+questions:
+  - What happens if the message is replayed, delayed, or reorged?
+required_artifacts:
+  - message-schema
+  - validator-set
+stop_conditions:
+  - assuming instant finality
+false_positive_traps:
+  - Local pause that already blocks replay
+completeness: "0.7"

@@ -1,0 +1,14 @@
+record_type: method
+canonical_key: krait-solodit-forge-concepts
+title: Solodit and Forge integration concepts
+summary: Historical Solodit hits are leads. Forge is the executable adapter. Never treat combined scores as validation.
+applicability_predicates:
+  - solodit-available
+  - foundry-available
+questions:
+  - Did Solodit only suggest a class, and did Foundry observe the behavior?
+required_artifacts:
+  - tool-run
+stop_conditions:
+  - collapsing Solodit and Foundry into one evidence grade
+completeness: "0.7"

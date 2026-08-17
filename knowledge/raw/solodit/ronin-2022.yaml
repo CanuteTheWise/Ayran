@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: ronin-2022
+title: Ronin validator threshold
+summary: Compromised validator keys met the signature threshold and withdrew locked funds.
+language: solidity
+protocol: bridge
+mechanism: bridge-validation
+root_cause: concentrated-validator-keys
+fix: Higher threshold and independent operators
+citation: solodit:curated:ronin-2022
+completeness: "0.7"

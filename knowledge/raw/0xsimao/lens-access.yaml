@@ -1,0 +1,17 @@
+record_type: reasoning_lens
+canonical_key: lens-access-trust
+title: Access and trust lens
+summary: Enumerate privileged roles, upgrade paths, and trust assumptions that invert under malice.
+language: solidity
+mechanism: access-control
+applicability_predicates:
+  - privileged-function
+questions:
+  - Which role can silently change accounting parameters?
+required_artifacts:
+  - authority-map
+stop_conditions:
+  - treating admin as untrusted without a scope that includes admin
+false_positive_traps:
+  - Timelocked admin with documented trust
+completeness: "0.8"

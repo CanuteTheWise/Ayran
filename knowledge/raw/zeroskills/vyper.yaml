@@ -1,0 +1,20 @@
+record_type: specialist_skill
+canonical_key: vyper-review
+title: Vyper specialist
+summary: Review Vyper-specific semantics including default mutability, range loops, and decimal handling.
+role_description: Language specialist for Vyper contracts when the target compiler is vyper.
+language: vyper
+chain: evm
+applicability_predicates:
+  - compiler-is-vyper
+non_applicability:
+  - solidity-only-targets
+questions:
+  - Which Vyper version predicates change overflow or default visibility?
+required_artifacts:
+  - vyper-version
+  - source-units
+stop_conditions:
+  - applying Solidity storage-gap heuristics to Vyper
+knowledge_policy: graph_aware
+token_budget: 800

@@ -1,0 +1,18 @@
+record_type: reasoning_lens
+canonical_key: lens-rounding
+title: Rounding lens
+summary: Direction of division in fee, share, and tick math; repeated rounding in loops.
+language: solidity
+mechanism: arithmetic-overflow
+applicability_predicates:
+  - division
+  - fee-on-transfer
+questions:
+  - Does rounding always favor the protocol, and can it be repeated?
+required_artifacts:
+  - formula-extract
+stop_conditions:
+  - rounding finding without a repeated-path or empty-market amplifier
+false_positive_traps:
+  - Directed rounding that cannot accumulate above dust
+completeness: "0.8"

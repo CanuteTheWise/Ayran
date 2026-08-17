@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "rubric_version": "ayran-eval-rubric-v1",
+  "blinded": true,
+  "arm_identity_withheld": true,
+  "axes": [
+    "severity_weighted_recall",
+    "precision",
+    "false_positive_rate",
+    "executable_poc_rate",
+    "defect_pinning_rate"
+  ]
+}

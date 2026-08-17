@@ -1,0 +1,21 @@
+{
+  "batch_size": 10000,
+  "command_batches": 10,
+  "composition": {
+    "assertion.added": 20000,
+    "edge.created": 30000,
+    "entity.tombstoned": 5000,
+    "node.created": 40000,
+    "node.revised": 5000
+  },
+  "event_count": 100000,
+  "fixed_timestamp": "2026-08-12T12:00:00Z",
+  "fixture_hash": "sha256:d51babdb6fa7df4648d3dc7f5d251dcc376502901bd8a8f2e273acd7aeea64b6",
+  "fixture_id": "graph-100k-v1",
+  "generator_version": "1.0.0",
+  "journal_format_version": 1,
+  "migration_version": 1,
+  "notes": "Object IDs and timestamps are deterministic; writer event/batch IDs remain unique.",
+  "projection_schema_version": "1.0.0",
+  "seed": 42913
+}

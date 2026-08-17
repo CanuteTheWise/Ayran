@@ -1,0 +1,84 @@
+schema_version: 1.0.0
+capability_id: cap_01J4TYFZ000000000000000001
+created_at: "2026-08-15T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - foundry
+  phases:
+    - validation
+    - falsification
+triggers:
+  - ityfuzz.hybrid
+questions_answered:
+  - does_hybrid_sequence_find_a_counterexample
+prerequisites:
+  - ityfuzz
+detect:
+  argv:
+    - ityfuzz
+    - "--version"
+  parser: ityfuzz_version_v1
+health_check:
+  method: ityfuzz_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "ItyfuzzRunRequest@1.0.0"
+output_schema: "ItyfuzzRunResult@1.0.0"
+invocation:
+  argv_template:
+    - ityfuzz
+    - fuzz
+    - "{target_dir}"
+  shell: false
+evidence_ceiling: observed
+resources:
+  cpu: 2
+  memory_mib: 2048
+  disk_mib: 2048
+  network: none
+sandbox_profile: evm-experimental
+secret_aliases: []
+timeout_seconds: 1800
+retry:
+  transient: 0
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - timeout
+  - oom
+  - policy
+  - internal
+fallbacks: []
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-15
+provenance:
+  - provenance_id: prv_01J4TYFZ000000000000000001
+    source_uri: "https://ayran.dev/capabilities/ityfuzz.hybrid"
+    source_version: 1.0.0
+    raw_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+    retrieved_at: "2026-08-15T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:90814387c4232f7a8dace1d32b637c64d213ec25b95af6357abe72722fbda86b"
+  excluded_fields:
+    - integrity.content_hash

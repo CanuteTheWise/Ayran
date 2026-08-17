@@ -1,0 +1,18 @@
+record_type: reasoning_lens
+canonical_key: lens-edge-states
+title: Edge-state lens
+summary: Zero supply, one wei, max uint, paused, and first-depositor states.
+language: solidity
+applicability_predicates:
+  - empty-market
+  - first-depositor
+questions:
+  - What is the exchange rate when totalSupply is zero?
+required_artifacts:
+  - constructor-state
+  - pause-paths
+stop_conditions:
+  - edge finding that cannot be reached after initialize
+false_positive_traps:
+  - Constructor that seeds dead shares
+completeness: "0.8"

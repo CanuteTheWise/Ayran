@@ -1,0 +1,87 @@
+schema_version: 1.0.0
+capability_id: cap_01J4S0C0000000000000000001
+created_at: "2026-08-13T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - solc
+  phases:
+    - mapping
+    - validation
+triggers:
+  - solc.compile
+  - build.solc
+questions_answered:
+  - does_the_target_compile
+  - which_solc_version_was_resolved
+prerequisites:
+  - solc
+detect:
+  argv:
+    - solc
+    - "--version"
+  parser: solc_version_v1
+health_check:
+  method: solc_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "SolcCompileRequest@1.0.0"
+output_schema: "SolcCompileResult@1.0.0"
+invocation:
+  argv_template:
+    - solc
+    - "--optimize"
+    - "--output-dir"
+    - "{output_dir}"
+    - "{source_paths}"
+  shell: false
+evidence_ceiling: observed
+resources:
+  cpu: 2
+  memory_mib: 1024
+  disk_mib: 256
+  network: none
+sandbox_profile: evm-compiler
+secret_aliases: []
+timeout_seconds: 120
+retry:
+  transient: 0
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - compile
+  - parser_drift
+  - timeout
+fallbacks: []
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-13
+provenance:
+  - provenance_id: prv_01J4S0C0000000000000000001
+    source_uri: "https://ayran.dev/capabilities/solc.compile"
+    source_version: 0.8.28
+    raw_hash: "sha256:66f8d7ad25aaad5574229f717346ce53bdc87d5df684fd03e7500b077c215c02"
+    retrieved_at: "2026-08-13T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:25e418e80afa9876b3b52b633eea8dd83ba60e8b1d8aa21a2e910c99877118c9"
+  excluded_fields:
+    - integrity.content_hash

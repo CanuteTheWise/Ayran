@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/graph-assertion.schema.json",
+  "title": "GraphAssertion",
+  "description": "Versioned assertion preserving writer, source, trust, uncertainty, contradiction, provenance, and event validity.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assertion_id",
+    "created_at",
+    "run_id",
+    "namespace",
+    "subject_id",
+    "predicate",
+    "object_kind",
+    "object_value",
+    "writer",
+    "written_at",
+    "source_version",
+    "identity",
+    "trust_class",
+    "confidence",
+    "provenance",
+    "artifact_refs",
+    "valid_from_event",
+    "supersedes",
+    "contradiction_group",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "assertion_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/RunId" },
+        { "type": "null" }
+      ]
+    },
+    "namespace": { "$ref": "common.schema.json#/$defs/GraphNamespace" },
+    "subject_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "object_kind": {
+      "type": "string",
+      "enum": ["identifier", "string", "integer", "number", "boolean", "hash"]
+    },
+    "object_value": { "type": ["string", "integer", "number", "boolean"] },
+    "writer": { "$ref": "actor.schema.json" },
+    "written_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "source_version": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version_hash"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["target", "corpus"] },
+        "id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "version_hash": { "$ref": "common.schema.json#/$defs/Hash" }
+      }
+    },
+    "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "artifact_refs": { "$ref": "common.schema.json#/$defs/HashList" },
+    "valid_from_event": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "valid_to_event": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Identifier" },
+        { "type": "null" }
+      ]
+    },
+    "supersedes": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "contradiction_group": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Identifier" },
+        { "type": "null" }
+      ]
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

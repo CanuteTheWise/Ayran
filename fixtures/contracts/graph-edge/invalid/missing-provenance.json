@@ -1,0 +1,27 @@
+{
+  "confidence": 1.0,
+  "created_at": "2026-08-12T12:00:00Z",
+  "edge_id": "edg_01J00000000000000000000001",
+  "edge_type": "CALLS",
+  "evidence_grade": "lead",
+  "evidence_refs": [],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:5a4b882c0fb8aa8cb08fccd6542d8fec0c7fe52fb142cdedb60f7a8e4d48141e",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "namespace": "target",
+  "properties": [],
+  "revision": 1,
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "source_id": "nod_01J00000000000000000000001",
+  "source_locator": "target/src/Vault.sol:10",
+  "status": "active",
+  "target_id": "nod_01J00000000000000000000002",
+  "trust_class": "deterministic_tool",
+  "valid_from_event": "evt_01J00000000000000000000001"
+}

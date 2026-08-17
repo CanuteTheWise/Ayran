@@ -1,0 +1,19 @@
+record_type: reasoning_lens
+canonical_key: lens-shares-exchange
+title: Shares and exchange-rate lens
+summary: Inspect convertToShares/convertToAssets rounding direction and empty-market extremes.
+language: solidity
+mechanism: accounting-desync
+component: vault
+applicability_predicates:
+  - share-token
+  - exchange-rate
+questions:
+  - Who receives leftover wei on mint versus redeem?
+required_artifacts:
+  - erc4626-interface
+stop_conditions:
+  - treating 1-wei rounding as high impact without a drain path
+false_positive_traps:
+  - Virtual offset already present
+completeness: "0.8"

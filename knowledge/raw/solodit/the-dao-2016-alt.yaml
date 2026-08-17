@@ -1,0 +1,14 @@
+record_type: incident
+canonical_key: the-dao-2016-alt-loss
+title: The DAO reentrancy 2016
+summary: Alternate curated citation records a different loss figure for the same root cause.
+language: solidity
+protocol: dao
+mechanism: reentrancy
+root_cause: external-call-before-balance-update
+impact: approximately 50 million USD contemporaneous
+fix: Hard fork recovery
+citation: solodit:curated:the-dao-2016-alt
+near_duplicate_lineage:
+  - the-dao-2016
+completeness: "0.6"

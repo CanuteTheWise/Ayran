@@ -1,0 +1,6 @@
+{
+  "id": "ayran.fixture",
+  "kind": "service",
+  "unexpected_security_field": "reject",
+  "version": "1.0.0"
+}

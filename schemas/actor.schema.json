@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/actor.schema.json",
+  "title": "Ayran Writer and Actor Identity",
+  "description": "Closed identity for a human, model, service, tool, gate, router, or importer that writes a durable record.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "id", "version"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "human",
+        "model",
+        "service",
+        "tool",
+        "specialist",
+        "gate",
+        "router",
+        "importer"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_.:-]*$"
+    },
+    "version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "independence_group": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_.:-]*$"
+    }
+  }
+}

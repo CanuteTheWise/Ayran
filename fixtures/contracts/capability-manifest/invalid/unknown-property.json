@@ -1,0 +1,111 @@
+{
+  "capability_id": "cap_01J00000000000000000000001",
+  "cleanup": {
+    "preserve_artifacts": true,
+    "receipt_owned_only": true,
+    "remove_external_dependencies": false
+  },
+  "cooldown": {
+    "consecutive_failures": 2,
+    "scope": "run"
+  },
+  "created_at": "2026-08-12T12:00:00Z",
+  "detect": {
+    "argv": [
+      "forge",
+      "--version"
+    ],
+    "parser": "foundry-version-v1"
+  },
+  "evidence_ceiling": "observed",
+  "failure_taxonomy": [
+    "prerequisite",
+    "compile",
+    "test",
+    "timeout",
+    "parser_drift"
+  ],
+  "fallbacks": [],
+  "health_check": {
+    "method": "foundry.health"
+  },
+  "input_schema": "FoundryRequest@1.0.0",
+  "install_policy": {
+    "allowed": false,
+    "approval": "never",
+    "checksum_required": true,
+    "global_mutation_allowed": false
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:47f79dbbf14f83e4c6f8f90e923bd47c6294d9af6c45241c44dc42f07eba2262",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "invocation": {
+    "argv_template": [
+      "forge",
+      "test",
+      "--json"
+    ],
+    "shell": false
+  },
+  "kind": "executable_adapter",
+  "last_verified": "2026-08-12",
+  "output_schema": "FoundryResult@1.0.0",
+  "owner": "tools-evm",
+  "ownership": "external_detect_only",
+  "prerequisites": [
+    "forge"
+  ],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "questions_answered": [
+    "Does behavior reproduce?"
+  ],
+  "resources": {
+    "cpu": 4,
+    "disk_mib": 4096,
+    "memory_mib": 3072,
+    "network": "none"
+  },
+  "retry": {
+    "deterministic": 0,
+    "transient": 1
+  },
+  "sandbox_profile": "evm-validator",
+  "schema_version": "1.0.0",
+  "secret_aliases": [],
+  "supports": {
+    "chains": [
+      "evm"
+    ],
+    "frameworks": [
+      "foundry"
+    ],
+    "languages": [
+      "solidity"
+    ],
+    "phases": [
+      "mapping",
+      "validation"
+    ]
+  },
+  "timeout_seconds": 900,
+  "triggers": [
+    "build.foundry"
+  ],
+  "unexpected_security_field": "reject",
+  "version": "1.0.0"
+}

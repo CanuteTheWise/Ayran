@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/graph-node.schema.json",
+  "title": "GraphNode",
+  "description": "Versioned graph node identity and closed typed-property set with provenance, integrity, and distinct trust/confidence/evidence semantics.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "node_id",
+    "created_at",
+    "run_id",
+    "namespace",
+    "node_type",
+    "revision",
+    "status",
+    "properties",
+    "trust_class",
+    "confidence",
+    "evidence_grade",
+    "evidence_refs",
+    "source_locator",
+    "valid_from_event",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "node_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/RunId" },
+        { "type": "null" }
+      ]
+    },
+    "namespace": { "$ref": "common.schema.json#/$defs/GraphNamespace" },
+    "node_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "stale_pending_revalidation", "tombstoned"]
+    },
+    "properties": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/TypedProperty" },
+      "maxItems": 256
+    },
+    "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "evidence_grade": { "$ref": "common.schema.json#/$defs/EvidenceGrade" },
+    "evidence_refs": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "source_locator": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "valid_from_event": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "valid_to_event": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Identifier" },
+        { "type": "null" }
+      ]
+    },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

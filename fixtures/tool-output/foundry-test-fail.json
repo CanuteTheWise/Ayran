@@ -1,0 +1,18 @@
+{
+  "duration": {"secs": 0, "nanos": 1800000},
+  "test_results": {
+    "test/Counter.t.sol:CounterTest": {
+      "testFail()": {
+        "status": "Failure",
+        "reason": "assertion failed: 1 != 2",
+        "counterexample": null,
+        "decoded_logs": [],
+        "kind": {"Standard": 21000},
+        "traces": ["trace"],
+        "labeled_addresses": {},
+        "duration": {"secs": 0, "nanos": 500000},
+        "gas": 21000
+      }
+    }
+  }
+}

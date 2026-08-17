@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: euler-2023
+title: Euler donate and liquidate
+summary: Donation inflated the violation metric so a liquidator could seize more than the violator owed.
+language: solidity
+protocol: defi-lending
+mechanism: accounting-desync
+root_cause: donation-inflated-liquidation
+fix: Isolate donation from health-factor math
+citation: solodit:curated:euler-2023
+completeness: "0.8"

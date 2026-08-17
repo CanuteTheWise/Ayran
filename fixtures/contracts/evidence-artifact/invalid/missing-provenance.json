@@ -1,0 +1,59 @@
+{
+  "artifact_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "confidence": 1.0,
+  "config_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "created_at": "2026-08-12T12:00:00Z",
+  "evidence_grade": "observed",
+  "evidence_id": "evd_01J00000000000000000000001",
+  "fork_identity_hash": null,
+  "input_hashes": [
+    "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:ca89555209e1f37941031afd7031d5b6caad11605627460bc7bb39eb2257cd4d",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "mime_type": "application/json",
+  "normalized_locator": null,
+  "producer": {
+    "id": "foundry",
+    "kind": "tool",
+    "version": "1.0.0"
+  },
+  "producer_version": "1.0.0",
+  "raw_locator": "run/artifacts/raw.json",
+  "redaction": {
+    "profile": "default",
+    "redacted": false,
+    "secret_scan_passed": true
+  },
+  "refutes": [],
+  "reproduction": {
+    "argv": [
+      "forge",
+      "test",
+      "--match-test",
+      "testDonation"
+    ],
+    "environment_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "expected_result_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "working_root": "run/work"
+  },
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "size_bytes": 100,
+  "supports": [
+    "hyp_01J00000000000000000000001"
+  ],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "trust_class": "runtime_observation"
+}

@@ -1,0 +1,14 @@
+record_type: method
+canonical_key: krait-candidate-proof-critic
+title: Candidate, proof, and critic separation
+summary: Keep candidate generation, executable proof, and independent critic as separate actors and artifacts.
+applicability_predicates:
+  - hypothesis-active
+questions:
+  - Has the critic seen only the claim and the PoC, not the originator narrative?
+required_artifacts:
+  - hypothesis-record
+  - poc-artifact
+stop_conditions:
+  - merging critic and originator in one pass
+completeness: "0.8"

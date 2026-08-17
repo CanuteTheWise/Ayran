@@ -1,0 +1,18 @@
+record_type: reasoning_lens
+canonical_key: lens-integration
+title: Integration assumption lens
+summary: Invert assumptions about tokens, oracles, vaults, and external protocols.
+language: solidity
+applicability_predicates:
+  - external-token
+  - oracle
+  - nested-vault
+questions:
+  - What if the token is fee-on-transfer, rebasing, or ERC777?
+required_artifacts:
+  - integration-assumption-map
+stop_conditions:
+  - inventing an unsupported token without a reachable integration
+false_positive_traps:
+  - Strict token allowlist
+completeness: "0.8"

@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "vendor_id": "prime-agent-v0.7.2",
+  "upstream": {
+    "project": "Prime-Agent",
+    "repository": "https://github.com/PrimeIntellect-ai/prime-agent",
+    "release": "v0.7.2",
+    "commit": "83a0f9f9566219551fcb6ffaf7f519a815749a58"
+  },
+  "artifact": {
+    "package_name": "prime-agent",
+    "package_version": "0.7.2",
+    "url": "https://github.com/PrimeIntellect-ai/prime-agent/releases/download/v0.7.2/prime-agent-0.7.2.tgz",
+    "sha256": "bc5471f2a626d727b88a45eb745fff93b10c554a3c4fc5912f25d8c64b987f5e",
+    "size_bytes": 9387295,
+    "integrity_source": "GitHub release asset digest and SHA256SUMS",
+    "integrity_status": "verified",
+    "cached_locally": true,
+    "cache_path": "vendor/cache/prime-agent-0.7.2.tgz",
+    "cache_is_release_input_only_after_verification": true
+  },
+  "source_state": {
+    "modified": false,
+    "patches": [],
+    "repacked": false
+  },
+  "license": {
+    "spdx": "MIT",
+    "artifact_contains_license_file": false,
+    "required_license_file": "LICENSES/Prime-Agent-MIT.txt",
+    "canonical_source": "https://raw.githubusercontent.com/PrimeIntellect-ai/prime-agent/83a0f9f9566219551fcb6ffaf7f519a815749a58/LICENSE",
+    "sha256": "b288615fb31dc504623582fb790a28e6d86bc2f5c1396845af555e43386da5a0",
+    "required_notice": "Preserve the upstream MIT license and copyright notices with Ayran Complete."
+  },
+  "install_scripts": {
+    "contains_postinstall": true,
+    "review_required": true,
+    "bootstrap_environment_variables_must_be_unset": ["PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL", "PRIME_AGENT_BOOTSTRAP_TOOLS_ON_INSTALL"],
+    "external_tool_mutation_allowed": false
+  },
+  "dependency_closure": {
+    "top_level_artifact_locked": true,
+    "transitive_release_closure_locked": true,
+    "status": "m9-url-closure-locked",
+    "manifest": "packaging/manifests/complete-deps.json",
+    "note": "M9 pins every git+/https/file/ssh URL to a SHA-256 or integrity digest. Complete install does not fetch Prime URL tarballs."
+  },
+  "verification": {
+    "method": "Download the official GitHub release asset, verify byte length and SHA-256, inspect embedded package identity, and compare the tag target commit.",
+    "verified_at": "2026-08-12T00:00:00Z",
+    "powershell": [
+      "Invoke-WebRequest -Uri https://github.com/PrimeIntellect-ai/prime-agent/releases/download/v0.7.2/prime-agent-0.7.2.tgz -OutFile vendor/cache/prime-agent-0.7.2.tgz",
+      "(Get-FileHash -Algorithm SHA256 vendor/cache/prime-agent-0.7.2.tgz).Hash.ToLowerInvariant()"
+    ],
+    "expected_sha256": "bc5471f2a626d727b88a45eb745fff93b10c554a3c4fc5912f25d8c64b987f5e"
+  },
+  "release_eligibility": "vendor-input-verified; Complete URL-closure locked in M9"
+}

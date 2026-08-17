@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/learning-outcome.schema.json",
+  "title": "LearningOutcome",
+  "description": "Quarantined adjudicated outcome. Released variants require review, tests, held-out evaluation, contamination lineage, rights, and rollback.",
+  "x-ayran-schema-version": "1.0.0",
+  "$defs": {
+    "CoreProperties": { "type": "object", "additionalProperties": false }
+  },
+  "oneOf": [
+    {
+      "title": "QuarantinedLearningOutcome",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "learning_outcome_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "promotion_stage",
+        "result",
+        "adjudication",
+        "generalized_candidate",
+        "source_lineage",
+        "rights",
+        "contamination_class",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "learning_outcome_id": {
+          "$ref": "common.schema.json#/$defs/Identifier"
+        },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "promotion_stage": { "const": "quarantined" },
+        "result": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "rejected",
+            "duplicate",
+            "inconclusive",
+            "unsafe"
+          ]
+        },
+        "adjudication": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "generalized_candidate": {
+          "type": ["string", "null"],
+          "maxLength": 4096
+        },
+        "source_lineage": { "$ref": "common.schema.json#/$defs/HashList" },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_or_terms",
+            "redistribution_allowed",
+            "reviewed"
+          ],
+          "properties": {
+            "license_or_terms": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "redistribution_allowed": { "type": "boolean" },
+            "reviewed": { "type": "boolean" }
+          }
+        },
+        "contamination_class": {
+          "type": "string",
+          "enum": ["production", "development", "sealed-holdout", "unknown"]
+        },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    },
+    {
+      "title": "EvaluatedLearningOutcome",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "learning_outcome_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "promotion_stage",
+        "result",
+        "adjudication",
+        "generalized_candidate",
+        "source_lineage",
+        "rights",
+        "contamination_class",
+        "reviewers",
+        "positive_test_ids",
+        "hard_negative_test_ids",
+        "held_out_evaluation",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "learning_outcome_id": {
+          "$ref": "common.schema.json#/$defs/Identifier"
+        },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "promotion_stage": { "const": "evaluated" },
+        "result": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "rejected",
+            "duplicate",
+            "inconclusive",
+            "unsafe"
+          ]
+        },
+        "adjudication": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "generalized_candidate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "source_lineage": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Hash" },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_or_terms",
+            "redistribution_allowed",
+            "reviewed"
+          ],
+          "properties": {
+            "license_or_terms": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "redistribution_allowed": { "type": "boolean" },
+            "reviewed": { "type": "boolean", "const": true }
+          }
+        },
+        "contamination_class": {
+          "type": "string",
+          "enum": ["production", "development"]
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "$ref": "actor.schema.json" },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "positive_test_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "hard_negative_test_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "held_out_evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evaluation_id",
+            "passed",
+            "result_hash",
+            "project_families"
+          ],
+          "properties": {
+            "evaluation_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+            "passed": { "type": "boolean" },
+            "result_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+            "project_families": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1000
+            }
+          }
+        },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    },
+    {
+      "title": "ReleasedLearningOutcome",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "learning_outcome_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "promotion_stage",
+        "result",
+        "adjudication",
+        "generalized_candidate",
+        "source_lineage",
+        "rights",
+        "contamination_class",
+        "reviewers",
+        "positive_test_ids",
+        "hard_negative_test_ids",
+        "held_out_evaluation",
+        "release_pointer",
+        "rollback_pointer",
+        "promotion_approved_by",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "learning_outcome_id": {
+          "$ref": "common.schema.json#/$defs/Identifier"
+        },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "promotion_stage": { "const": "released" },
+        "result": { "const": "accepted" },
+        "adjudication": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "generalized_candidate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "source_lineage": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Hash" },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_or_terms",
+            "redistribution_allowed",
+            "reviewed"
+          ],
+          "properties": {
+            "license_or_terms": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "redistribution_allowed": { "type": "boolean" },
+            "reviewed": { "type": "boolean", "const": true }
+          }
+        },
+        "contamination_class": {
+          "type": "string",
+          "enum": ["production", "development"]
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "$ref": "actor.schema.json" },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "positive_test_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "hard_negative_test_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "held_out_evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evaluation_id",
+            "passed",
+            "result_hash",
+            "project_families"
+          ],
+          "properties": {
+            "evaluation_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+            "passed": { "type": "boolean", "const": true },
+            "result_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+            "project_families": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1000
+            }
+          }
+        },
+        "release_pointer": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "rollback_pointer": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "promotion_approved_by": { "$ref": "actor.schema.json" },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    }
+  ]
+}

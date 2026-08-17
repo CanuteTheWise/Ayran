@@ -1,0 +1,28 @@
+record_type: specialist_skill
+canonical_key: storage-layout
+title: Storage layout specialist
+summary: Map proxy and inherited storage slots, initializer gaps, and EIP-1967 namespaces before hypothesizing collisions.
+role_description: Precise storage-layout specialist for upgradeable and inherited Solidity contracts.
+language: solidity
+chain: evm
+component: proxy
+mechanism: storage-collision
+applicability_predicates:
+  - upgradeable-proxy
+  - inherited-storage
+  - eip1967-slot
+non_applicability:
+  - non-upgradeable-stateless-libraries
+questions:
+  - Which slots are occupied by inherited state versus namespaced diamond storage?
+  - Does a new parent variable shift an existing gap?
+required_artifacts:
+  - storage-layout-json
+  - inheritance-graph
+stop_conditions:
+  - collision hypothesized without a concrete slot number
+  - treating compiler storage layout as exploit proof
+false_positive_traps:
+  - Sequential layout changes that are unused in the deployed implementation
+knowledge_policy: graph_aware
+token_budget: 1200

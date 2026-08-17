@@ -1,0 +1,182 @@
+{
+  "fixtures": [
+    {
+      "contamination_group": "grp_clean",
+      "content_hash": "sha256:e3bc8e7ccc3d6d61f77fc10ef786e4f5b4c686e8a755b1fb6252ce235c542a3c",
+      "first_arm": "A0",
+      "fixture_id": "sev_b8218575076a90b73ce904e9",
+      "flaky": false,
+      "ground_truth": [],
+      "optional_tool": "",
+      "partition": "train",
+      "project_family": "fam_vault",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "none",
+      "scenario": "clean_target"
+    },
+    {
+      "contamination_group": "grp_cei",
+      "content_hash": "sha256:42ce521a6e71ff1eb60877f8d15f726821472c578e24d64c5db46f7f122320b7",
+      "first_arm": "A5",
+      "fixture_id": "sev_f7191efe5afd5fc1bc5d3bc5",
+      "flaky": false,
+      "ground_truth": [
+        {
+          "novel": true,
+          "root_cause_family": "reentrancy",
+          "root_cause_id": "rc_cei_external_call",
+          "severity": 0.9,
+          "validated_requires_gate_b": true
+        }
+      ],
+      "optional_tool": "",
+      "partition": "test",
+      "project_family": "fam_vault",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "reentrancy",
+      "scenario": "known_vulnerable"
+    },
+    {
+      "contamination_group": "grp_shares",
+      "content_hash": "sha256:ec60deb3fb4b9f0cc9760903ee38fdb2462b3aa037944fa9e02753d4c2ad5499",
+      "first_arm": "A3",
+      "fixture_id": "sev_ff7c70a5848cc4f2b7eaeecc",
+      "flaky": false,
+      "ground_truth": [
+        {
+          "novel": true,
+          "root_cause_family": "accounting",
+          "root_cause_id": "rc_share_rounding",
+          "severity": 0.6,
+          "validated_requires_gate_b": true
+        }
+      ],
+      "optional_tool": "",
+      "partition": "development",
+      "project_family": "fam_vault",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "accounting",
+      "scenario": "ambiguous_economic"
+    },
+    {
+      "contamination_group": "grp_cei",
+      "content_hash": "sha256:b5ef17eafb209a471f0e34d9539788db5207e8a84afbef9003cc14fc60339938",
+      "first_arm": "A4",
+      "fixture_id": "sev_d9c6f8bb144b2febcdae68f5",
+      "flaky": false,
+      "ground_truth": [
+        {
+          "novel": false,
+          "root_cause_family": "reentrancy",
+          "root_cause_id": "rc_cei_historical",
+          "severity": 0.7,
+          "validated_requires_gate_b": true
+        }
+      ],
+      "optional_tool": "",
+      "partition": "test",
+      "project_family": "fam_bridge",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "reentrancy",
+      "scenario": "duplicate_known"
+    },
+    {
+      "contamination_group": "grp_cei",
+      "content_hash": "sha256:5f522750a89586f86e64c83107c460750835d948d041fa08532b86c8c82f41c0",
+      "first_arm": "A5",
+      "fixture_id": "sev_05e8af84305ce4b3191f1b44",
+      "flaky": true,
+      "ground_truth": [
+        {
+          "novel": true,
+          "root_cause_family": "reentrancy",
+          "root_cause_id": "rc_cei_external_call",
+          "severity": 0.9,
+          "validated_requires_gate_b": true
+        }
+      ],
+      "optional_tool": "",
+      "partition": "development",
+      "project_family": "fam_vault",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "reentrancy",
+      "scenario": "flaky_poc"
+    },
+    {
+      "contamination_group": "grp_oracle",
+      "content_hash": "sha256:44e4d263d284a93d7fbb21c04b14a0987ee67b14db494fa559ff47892791bd93",
+      "first_arm": "A2",
+      "fixture_id": "sev_856c9adaad4d4b0ad623c359",
+      "flaky": false,
+      "ground_truth": [],
+      "optional_tool": "adapter.slither",
+      "partition": "train",
+      "project_family": "fam_amm",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "oracle",
+      "scenario": "unavailable_optional_tool"
+    },
+    {
+      "contamination_group": "grp_tools",
+      "content_hash": "sha256:1978ff7743abafc142b8bf7cdacae3df951d8657d1666aa39a69caa0cd782076",
+      "first_arm": "A2",
+      "fixture_id": "sev_428b1e4961e2763c68ecc6a2",
+      "flaky": false,
+      "ground_truth": [],
+      "optional_tool": "",
+      "partition": "development",
+      "project_family": "fam_vault",
+      "required_tool": "adapter.foundry",
+      "resume": false,
+      "root_cause_family": "none",
+      "scenario": "required_tool_failure"
+    },
+    {
+      "contamination_group": "grp_cei",
+      "content_hash": "sha256:5d861b83f80a309bc7b3f127bb08625f64b6152695b09cec584f294ea9d34398",
+      "first_arm": "A5",
+      "fixture_id": "sev_95accd0cabacbe1223f1a58c",
+      "flaky": false,
+      "ground_truth": [
+        {
+          "novel": true,
+          "root_cause_family": "reentrancy",
+          "root_cause_id": "rc_cei_external_call",
+          "severity": 0.9,
+          "validated_requires_gate_b": true
+        }
+      ],
+      "optional_tool": "",
+      "partition": "test",
+      "project_family": "fam_vault",
+      "required_tool": "",
+      "resume": true,
+      "root_cause_family": "reentrancy",
+      "scenario": "resume_after_crash"
+    },
+    {
+      "contamination_group": "grp_clean",
+      "content_hash": "sha256:cc075c2e50bb8708b100702dc77ccef79dcaf0309a1fac7faddcb947df798827",
+      "first_arm": "A0",
+      "fixture_id": "sev_4dea8f9c9a67bb106becdb0c",
+      "flaky": false,
+      "ground_truth": [],
+      "optional_tool": "",
+      "partition": "test",
+      "project_family": "fam_nft",
+      "required_tool": "",
+      "resume": false,
+      "root_cause_family": "none",
+      "scenario": "no_finding_report"
+    }
+  ],
+  "ingestion": "forbidden",
+  "kind": "ayran-sealed-evaluation-catalog",
+  "schema_version": "1.0.0"
+}

@@ -1,0 +1,84 @@
+schema_version: 1.0.0
+capability_id: cap_01J4HA1M000000000000000001
+created_at: "2026-08-15T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - foundry
+  phases:
+    - validation
+    - falsification
+triggers:
+  - halmos.symbolic
+questions_answered:
+  - does_bounded_property_hold
+prerequisites:
+  - halmos
+detect:
+  argv:
+    - halmos
+    - "--version"
+  parser: halmos_version_v1
+health_check:
+  method: halmos_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "HalmosRunRequest@1.0.0"
+output_schema: "HalmosRunResult@1.0.0"
+invocation:
+  argv_template:
+    - halmos
+    - "{target_dir}"
+  shell: false
+evidence_ceiling: observed
+resources:
+  cpu: 2
+  memory_mib: 2048
+  disk_mib: 1024
+  network: none
+sandbox_profile: evm-experimental
+secret_aliases: []
+timeout_seconds: 1800
+retry:
+  transient: 0
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - timeout
+  - oom
+  - policy
+  - internal
+fallbacks:
+  - foundry.test
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-15
+provenance:
+  - provenance_id: prv_01J4HA1M000000000000000001
+    source_uri: "https://ayran.dev/capabilities/halmos.symbolic"
+    source_version: 1.0.0
+    raw_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000005"
+    retrieved_at: "2026-08-15T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:c6567cff14b78b07be8d25198153d4fb8c77e7147d6d3bb659904874762e62f6"
+  excluded_fields:
+    - integrity.content_hash

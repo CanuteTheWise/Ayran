@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/capability-manifest.schema.json",
+  "title": "CapabilityManifest",
+  "description": "Declarative, closed capability contract. It accepts argv arrays and secret aliases, never shell strings or secret values.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capability_id",
+    "created_at",
+    "version",
+    "kind",
+    "ownership",
+    "supports",
+    "triggers",
+    "questions_answered",
+    "prerequisites",
+    "detect",
+    "health_check",
+    "install_policy",
+    "input_schema",
+    "output_schema",
+    "invocation",
+    "evidence_ceiling",
+    "resources",
+    "sandbox_profile",
+    "secret_aliases",
+    "timeout_seconds",
+    "retry",
+    "cooldown",
+    "failure_taxonomy",
+    "fallbacks",
+    "cleanup",
+    "owner",
+    "last_verified",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "capability_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "executable_adapter",
+        "http_adapter",
+        "skill",
+        "specialist",
+        "deterministic_service"
+      ]
+    },
+    "ownership": {
+      "type": "string",
+      "enum": ["ayran", "external_detect_only"]
+    },
+    "supports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languages", "chains", "frameworks", "phases"],
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "maxItems": 32
+        },
+        "chains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "maxItems": 32
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "maxItems": 32
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "scope",
+              "mapping",
+              "discovery",
+              "validation",
+              "falsification",
+              "dedup",
+              "reporting"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "questions_answered": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "maxItems": 64
+    },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "parser"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 },
+          "minItems": 1,
+          "maxItems": 32
+        },
+        "parser": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" }
+      }
+    },
+    "health_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "method": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" }
+      }
+    },
+    "install_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed",
+        "approval",
+        "checksum_required",
+        "global_mutation_allowed"
+      ],
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "approval": { "type": "string", "enum": ["always", "never"] },
+        "checksum_required": { "type": "boolean" },
+        "global_mutation_allowed": { "type": "boolean", "const": false }
+      }
+    },
+    "input_schema": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*@1\\.0\\.0$"
+    },
+    "output_schema": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*@1\\.0\\.0$"
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv_template", "shell"],
+      "properties": {
+        "argv_template": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "shell": { "type": "boolean", "const": false }
+      }
+    },
+    "evidence_ceiling": { "$ref": "common.schema.json#/$defs/EvidenceCeiling" },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory_mib", "disk_mib", "network"],
+      "properties": {
+        "cpu": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "memory_mib": { "type": "integer", "minimum": 64, "maximum": 131072 },
+        "disk_mib": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "network": {
+          "type": "string",
+          "enum": [
+            "none",
+            "approved-api",
+            "rpc-allowlist",
+            "approved-source-fetch"
+          ]
+        }
+      }
+    },
+    "sandbox_profile": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "secret_aliases": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}_REF$" },
+      "maxItems": 16,
+      "uniqueItems": true
+    },
+    "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transient", "deterministic"],
+      "properties": {
+        "transient": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "deterministic": { "type": "integer", "const": 0 }
+      }
+    },
+    "cooldown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consecutive_failures", "scope"],
+      "properties": {
+        "consecutive_failures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "scope": { "type": "string", "enum": ["action", "run", "environment"] }
+      }
+    },
+    "failure_taxonomy": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "prerequisite",
+          "compile",
+          "test",
+          "timeout",
+          "oom",
+          "network",
+          "rpc",
+          "parser_drift",
+          "policy",
+          "internal"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "fallbacks": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+      "maxItems": 16
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_owned_only",
+        "preserve_artifacts",
+        "remove_external_dependencies"
+      ],
+      "properties": {
+        "receipt_owned_only": { "type": "boolean", "const": true },
+        "preserve_artifacts": { "type": "boolean" },
+        "remove_external_dependencies": { "type": "boolean", "const": false }
+      }
+    },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "last_verified": { "type": "string", "format": "date" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

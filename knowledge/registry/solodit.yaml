@@ -1,0 +1,22 @@
+source_id: solodit
+display_name: Solodit curated incidents
+source_type: api
+origin: https://solodit.cyfrin.io
+pin:
+  commit: ""
+  tag: curated-v0.1.0
+  archive_sha256: ""
+license:
+  spdx_id: LicenseRef-Solodit-Provider-Terms
+  attribution_required: true
+  local_use: true
+  redistribution: false
+  retention_constraint: provider-terms
+trust_tier: curated_external
+reproduction_status: unverified
+contamination_flags: []
+contamination_registry: production
+phase: proposed
+authors:
+  - Cyfrin
+notes: Manually curated incident cards with citation IDs. Not a live API scrape. Provider terms captured separately from the M4 HTTP adapter.

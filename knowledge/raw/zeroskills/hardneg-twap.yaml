@@ -1,0 +1,13 @@
+record_type: false_positive_trap
+canonical_key: twap-freshness
+title: TWAP with freshness bound is not a spot oracle
+hard_negative: true
+mechanism: oracle-manipulation
+language: solidity
+component: amm
+why_safe: The price is a time-weighted observation rejected when updatedAt is stale.
+distinction: The dangerous variant reads pair.getReserves() in the same block as a swap.
+safe_variant_code: "require(updatedAt + stalePeriod >= block.timestamp); price = observeTwap();"
+applicability_predicates:
+  - price-from-pool
+summary: Hard negative for oracle greps that flag every reserve read.

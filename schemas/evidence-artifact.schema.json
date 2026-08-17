@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/evidence-artifact.schema.json",
+  "title": "EvidenceArtifact",
+  "description": "Immutable target-bound evidence with producer, inputs, trust, grade, redaction, and deterministic reproduction metadata.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "artifact_hash",
+    "size_bytes",
+    "mime_type",
+    "producer",
+    "producer_version",
+    "input_hashes",
+    "config_hash",
+    "fork_identity_hash",
+    "raw_locator",
+    "normalized_locator",
+    "evidence_grade",
+    "trust_class",
+    "confidence",
+    "supports",
+    "refutes",
+    "redaction",
+    "reproduction",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "evidence_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "artifact_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "mime_type": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*$"
+    },
+    "producer": { "$ref": "actor.schema.json" },
+    "producer_version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "input_hashes": { "$ref": "common.schema.json#/$defs/HashList" },
+    "config_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "fork_identity_hash": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/Hash" },
+        { "type": "null" }
+      ]
+    },
+    "raw_locator": { "$ref": "common.schema.json#/$defs/RelativePath" },
+    "normalized_locator": {
+      "oneOf": [
+        { "$ref": "common.schema.json#/$defs/RelativePath" },
+        { "type": "null" }
+      ]
+    },
+    "evidence_grade": { "$ref": "common.schema.json#/$defs/EvidenceGrade" },
+    "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "supports": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "refutes": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "secret_scan_passed", "redacted"],
+      "properties": {
+        "profile": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "secret_scan_passed": { "type": "boolean" },
+        "redacted": { "type": "boolean" }
+      }
+    },
+    "reproduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv",
+        "working_root",
+        "environment_hash",
+        "expected_result_hash"
+      ],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 512 },
+          "minItems": 1,
+          "maxItems": 128
+        },
+        "working_root": { "$ref": "common.schema.json#/$defs/RelativePath" },
+        "environment_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+        "expected_result_hash": { "$ref": "common.schema.json#/$defs/Hash" }
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

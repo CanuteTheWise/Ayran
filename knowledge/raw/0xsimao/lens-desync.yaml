@@ -1,0 +1,19 @@
+record_type: reasoning_lens
+canonical_key: lens-desynchronization
+title: Accounting desynchronization lens
+summary: Ask where cached totals, shares, and underlying balances can disagree.
+language: solidity
+mechanism: accounting-desync
+applicability_predicates:
+  - share-token
+  - cached-totals
+questions:
+  - Which stored total can diverge from the sum of user balances?
+required_artifacts:
+  - state-variable-map
+  - share-math
+stop_conditions:
+  - reporting a desync without a reachable write path
+false_positive_traps:
+  - View-only caches refreshed on every mutating path
+completeness: "0.8"

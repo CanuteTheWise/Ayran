@@ -1,0 +1,22 @@
+record_type: specialist_skill
+canonical_key: symmetry-path
+title: Symmetry and path comparison specialist
+summary: Compare sibling paths, cached versus derived state, and asymmetric fees or rounding.
+role_description: Path-comparison specialist for protocols with parallel actions that must conserve value.
+language: solidity
+mechanism: accounting-desync
+component: vault
+applicability_predicates:
+  - sibling-paths
+  - cached-derived-state
+questions:
+  - Which two paths should produce the same residual for the same inputs?
+required_artifacts:
+  - control-flow-map
+  - value-flow-map
+stop_conditions:
+  - declaring symmetry without naming both paths
+false_positive_traps:
+  - Intentional asymmetry documented in the spec
+knowledge_policy: graph_aware
+token_budget: 1000

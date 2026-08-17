@@ -1,0 +1,15 @@
+record_type: finding_pattern
+canonical_key: pattern-empty-market-inflation
+title: Empty market inflation pattern
+summary: First depositor or donation sets an extreme share price used by later users.
+language: solidity
+protocol: defi-vault
+mechanism: accounting-desync
+component: vault
+applicability_predicates:
+  - share-token
+  - virtual-offset-missing
+code_signals:
+  - totalSupply() == 0
+  - convertToShares
+completeness: "0.7"

@@ -1,0 +1,76 @@
+{
+  "adjudication": "Fixture outcome accepted",
+  "contamination_class": "development",
+  "created_at": "2026-08-12T12:00:00Z",
+  "generalized_candidate": "Direct-transfer accounting lens",
+  "hard_negative_test_ids": [
+    "tst_01J00000000000000000000002"
+  ],
+  "held_out_evaluation": {
+    "evaluation_id": "evl_01J00000000000000000000001",
+    "passed": true,
+    "project_families": 2,
+    "result_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:94ca1950a64a353f1375af7fac09953cfc6ee3256616b94144f74f3608ef0f35",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "learning_outcome_id": "lrn_01J00000000000000000000001",
+  "positive_test_ids": [
+    "tst_01J00000000000000000000001"
+  ],
+  "promotion_approved_by": {
+    "id": "operator",
+    "kind": "human",
+    "version": "1.0.0"
+  },
+  "promotion_stage": "released",
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "release_pointer": "rel_01J00000000000000000000001",
+  "result": "accepted",
+  "reviewers": [
+    {
+      "id": "operator",
+      "kind": "human",
+      "version": "1.0.0"
+    },
+    {
+      "id": "independent-reviewer",
+      "independence_group": "fixture-independent",
+      "kind": "service",
+      "version": "1.0.0"
+    }
+  ],
+  "rights": {
+    "license_or_terms": "private",
+    "redistribution_allowed": false,
+    "reviewed": true
+  },
+  "rollback_pointer": "rel_01J00000000000000000000002",
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "source_lineage": [
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  }
+}

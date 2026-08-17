@@ -1,0 +1,18 @@
+record_type: reasoning_lens
+canonical_key: lens-ordering-mev
+title: Ordering and MEV lens
+summary: Identify value that depends on transaction order, back-running, or same-block oracles.
+language: solidity
+mechanism: oracle-manipulation
+applicability_predicates:
+  - same-block-price
+  - liquidation
+questions:
+  - Which action is profitable if the attacker also includes a sandwich?
+required_artifacts:
+  - mempool-sensitive-paths
+stop_conditions:
+  - labeling MEV without a captured value path
+false_positive_traps:
+  - Commit-reveal already in place
+completeness: "0.7"

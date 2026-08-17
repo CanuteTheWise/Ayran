@@ -1,0 +1,27 @@
+version: 1.0.0
+family: tools
+entries:
+  - id: slither
+    capability_id: slither
+    attack_surfaces: [proxy, vault, amm, lending, governance, staking]
+    mechanisms: [reentrancy, access-control, arithmetic-overflow, storage-collision]
+    protocols: [defi-lending, defi-amm, defi-vault, dao]
+    evidence_ceiling: lead
+  - id: foundry
+    capability_id: foundry
+    attack_surfaces: [vault, amm, lending, bridge, staking]
+    mechanisms: [reentrancy, flash-loan, oracle-manipulation, accounting-desync]
+    protocols: [defi-lending, defi-amm, defi-vault, bridge]
+    evidence_ceiling: observed
+  - id: solc
+    capability_id: solc
+    attack_surfaces: [proxy, vault, amm, lending, bridge, governance]
+    mechanisms: [arithmetic-overflow, storage-collision]
+    protocols: [defi-lending, defi-amm, defi-vault, dao, nft, bridge]
+    evidence_ceiling: observed
+  - id: solodit
+    capability_id: solodit
+    attack_surfaces: [proxy, vault, amm, lending, bridge, governance]
+    mechanisms: [reentrancy, oracle-manipulation, access-control, bridge-validation]
+    protocols: [defi-lending, defi-amm, defi-vault, dao, bridge]
+    evidence_ceiling: lead

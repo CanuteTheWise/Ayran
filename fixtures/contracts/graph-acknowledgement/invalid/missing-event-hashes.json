@@ -1,0 +1,30 @@
+{
+  "batch_id": "bat_01J00000000000000000000001",
+  "commit_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "event_hashes": [],
+  "event_ids": [
+    "evt_01J00000000000000000000020"
+  ],
+  "first_seq": 1,
+  "idempotency_key": "fixture:journal:1",
+  "idempotent_replay": false,
+  "journal_format_version": 1,
+  "last_seq": 1,
+  "operation_id": "op_01J00000000000000000000020",
+  "projection_cursor": 1,
+  "projection_event_hash": "sha256:a3aa3d716159905e183ff846c2bcbccb4a48a71a49bbfd772cc65d49f8b0bc94",
+  "request_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "schema_version": "1.0.0",
+  "stream": {
+    "namespace": "target",
+    "run_id": "run_01J00000000000000000000001",
+    "stream_id": "str_01J00000000000000000000001",
+    "target_identity": {
+      "commit": "1111111111111111111111111111111111111111",
+      "scope_id": "scp_01J00000000000000000000001",
+      "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "target_id": "tgt_01J00000000000000000000001"
+    },
+    "target_key": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

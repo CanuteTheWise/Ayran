@@ -1,0 +1,22 @@
+source_id: krait
+display_name: Krait derived methodology
+source_type: derived_methodology
+origin: https://github.com/ZealynxSecurity/krait
+pin:
+  commit: 76e5ac7b74ce5517409870c2974e6baaddc8f99e
+  tag: ""
+  archive_sha256: ""
+license:
+  spdx_id: MIT
+  attribution_required: true
+  local_use: true
+  redistribution: false
+  retention_constraint: none
+trust_tier: curated_external
+reproduction_status: unverified
+contamination_flags: []
+contamination_registry: production
+phase: proposed
+authors:
+  - Zealynx Security
+notes: Derived reasoning lenses only. Never run its Anthropic scheduler. Never treat self-reported scores as evidence.

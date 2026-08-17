@@ -1,0 +1,84 @@
+schema_version: 1.0.0
+capability_id: cap_01J4ECHD000000000000000001
+created_at: "2026-08-15T00:00:00Z"
+version: 1.0.0
+kind: executable_adapter
+ownership: external_detect_only
+supports:
+  languages:
+    - solidity
+  chains:
+    - evm
+  frameworks:
+    - foundry
+  phases:
+    - validation
+    - falsification
+triggers:
+  - echidna.fuzz
+questions_answered:
+  - does_stateful_property_hold
+prerequisites:
+  - echidna
+detect:
+  argv:
+    - echidna
+    - "--version"
+  parser: echidna_version_v1
+health_check:
+  method: echidna_health_v1
+install_policy:
+  allowed: false
+  approval: always
+  checksum_required: true
+  global_mutation_allowed: false
+input_schema: "EchidnaFuzzRequest@1.0.0"
+output_schema: "EchidnaFuzzResult@1.0.0"
+invocation:
+  argv_template:
+    - echidna
+    - "{target_dir}"
+  shell: false
+evidence_ceiling: observed
+resources:
+  cpu: 2
+  memory_mib: 2048
+  disk_mib: 2048
+  network: none
+sandbox_profile: evm-experimental
+secret_aliases: []
+timeout_seconds: 1800
+retry:
+  transient: 0
+  deterministic: 0
+cooldown:
+  consecutive_failures: 2
+  scope: run
+failure_taxonomy:
+  - prerequisite
+  - timeout
+  - oom
+  - policy
+  - internal
+fallbacks:
+  - foundry.test
+cleanup:
+  receipt_owned_only: true
+  preserve_artifacts: true
+  remove_external_dependencies: false
+owner: tools-evm
+last_verified: 2026-08-15
+provenance:
+  - provenance_id: prv_01J4ECHD000000000000000001
+    source_uri: "https://ayran.dev/capabilities/echidna.fuzz"
+    source_version: 2.0.0
+    raw_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000003"
+    retrieved_at: "2026-08-15T00:00:00Z"
+    license_or_terms: external-detect-only
+    transformation_lineage: []
+integrity:
+  algorithm: sha256
+  canonicalization: rfc8785
+  content_hash: "sha256:0706b2d6a5ed74c8428a17751ac5ba920a1bc3950df04e2b667da552df78141a"
+  excluded_fields:
+    - integrity.content_hash

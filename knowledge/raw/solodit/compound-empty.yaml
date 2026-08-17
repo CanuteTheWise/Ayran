@@ -1,0 +1,11 @@
+record_type: incident
+canonical_key: compound-empty-market
+title: Compound empty-market cToken
+summary: An empty market allowed a donation to set an extreme exchange rate for later borrowers.
+language: solidity
+protocol: defi-lending
+mechanism: accounting-desync
+root_cause: empty-market-exchange-rate
+fix: Virtual offset or minimum shares
+citation: solodit:curated:compound-empty-market
+completeness: "0.7"

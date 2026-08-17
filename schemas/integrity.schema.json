@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/integrity.schema.json",
+  "title": "Ayran Integrity Envelope",
+  "description": "RFC 8785 canonical-content digest metadata. The named content hash field is excluded from its own digest.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "algorithm",
+    "canonicalization",
+    "content_hash",
+    "excluded_fields"
+  ],
+  "properties": {
+    "algorithm": { "type": "string", "const": "sha256" },
+    "canonicalization": { "type": "string", "const": "rfc8785" },
+    "content_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+    "excluded_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["integrity.content_hash", "event_hash"]
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true
+    }
+  }
+}

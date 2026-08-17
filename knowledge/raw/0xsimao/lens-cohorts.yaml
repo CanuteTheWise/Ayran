@@ -1,0 +1,18 @@
+record_type: reasoning_lens
+canonical_key: lens-cohorts
+title: Temporal cohort lens
+summary: Compare users who enter at different times against the same reward or vesting formula.
+language: solidity
+applicability_predicates:
+  - rewards
+  - vesting
+  - checkpoints
+questions:
+  - Can a later cohort inherit an earlier cohort's unpaid index?
+required_artifacts:
+  - temporal-map
+stop_conditions:
+  - mixing users from different timestamps without a shared index
+false_positive_traps:
+  - Explicit per-week buckets
+completeness: "0.7"

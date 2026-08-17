@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/finding.schema.json",
+  "title": "Finding",
+  "description": "Canonical target-bound finding. Only the validated variant contains final gate, causal, scope, impact, dedup, and severity obligations.",
+  "x-ayran-schema-version": "1.0.0",
+  "$defs": {
+    "Base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "finding_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "title",
+        "root_cause",
+        "violated_invariant",
+        "affected_code",
+        "attacker_model",
+        "preconditions",
+        "impact",
+        "evidence_ids",
+        "trust_class",
+        "confidence",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "finding_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "root_cause": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "violated_invariant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "affected_code": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "attacker_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "preconditions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "equation",
+            "lower_bound",
+            "upper_bound",
+            "assumptions"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "loss",
+                "theft",
+                "lock",
+                "governance",
+                "availability",
+                "integrity"
+              ]
+            },
+            "equation": { "type": "string", "minLength": 1, "maxLength": 2048 },
+            "lower_bound": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "upper_bound": { "type": ["string", "null"], "maxLength": 128 },
+            "assumptions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "maxItems": 64
+            }
+          }
+        },
+        "evidence_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+        "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+        "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "FindingCandidate",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "finding_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "status",
+        "title",
+        "root_cause",
+        "violated_invariant",
+        "affected_code",
+        "attacker_model",
+        "preconditions",
+        "impact",
+        "evidence_ids",
+        "trust_class",
+        "confidence",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "finding_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "status": { "const": "candidate" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "root_cause": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "violated_invariant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "affected_code": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "attacker_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "preconditions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "equation",
+            "lower_bound",
+            "upper_bound",
+            "assumptions"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "loss",
+                "theft",
+                "lock",
+                "governance",
+                "availability",
+                "integrity"
+              ]
+            },
+            "equation": { "type": "string", "minLength": 1, "maxLength": 2048 },
+            "lower_bound": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "upper_bound": { "type": ["string", "null"], "maxLength": 128 },
+            "assumptions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "maxItems": 64
+            }
+          }
+        },
+        "evidence_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+        "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+        "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    },
+    {
+      "title": "ValidatedFinding",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "finding_id",
+        "created_at",
+        "run_id",
+        "target_identity",
+        "status",
+        "title",
+        "root_cause",
+        "violated_invariant",
+        "affected_code",
+        "attacker_model",
+        "preconditions",
+        "impact",
+        "evidence_ids",
+        "gate_a_verdict_id",
+        "gate_b_verdict_id",
+        "reproduction_artifact_id",
+        "negative_control_ids",
+        "defect_fix_evidence_ids",
+        "scope_manifest_id",
+        "duplicate_disposition",
+        "severity",
+        "uncertainty",
+        "mitigations",
+        "trust_class",
+        "confidence",
+        "provenance",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "finding_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+        "target_identity": {
+          "$ref": "common.schema.json#/$defs/TargetIdentity"
+        },
+        "status": { "const": "validated" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "root_cause": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "violated_invariant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "affected_code": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "attacker_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "preconditions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "equation",
+            "lower_bound",
+            "upper_bound",
+            "assumptions"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "loss",
+                "theft",
+                "lock",
+                "governance",
+                "availability",
+                "integrity"
+              ]
+            },
+            "equation": { "type": "string", "minLength": 1, "maxLength": 2048 },
+            "lower_bound": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "upper_bound": { "type": ["string", "null"], "maxLength": 128 },
+            "assumptions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "maxItems": 64
+            }
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "gate_a_verdict_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "gate_b_verdict_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "reproduction_artifact_id": {
+          "$ref": "common.schema.json#/$defs/Identifier"
+        },
+        "negative_control_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "defect_fix_evidence_ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Identifier" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "scope_manifest_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "duplicate_disposition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "comparison", "source_refs"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["unique", "variant", "duplicate_known_issue"]
+            },
+            "comparison": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "source_refs": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/$defs/Uri" },
+              "maxItems": 32
+            }
+          }
+        },
+        "severity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["label", "policy_id", "rule_citation"],
+          "properties": {
+            "label": {
+              "type": "string",
+              "enum": ["informational", "low", "medium", "high", "critical"]
+            },
+            "policy_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+            "rule_citation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        },
+        "uncertainty": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "maxItems": 64
+        },
+        "mitigations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "trust_class": { "$ref": "common.schema.json#/$defs/TrustClass" },
+        "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "provenance.schema.json" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "integrity": { "$ref": "integrity.schema.json" }
+      }
+    }
+  ]
+}

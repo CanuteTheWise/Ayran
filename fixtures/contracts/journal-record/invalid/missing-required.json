@@ -1,0 +1,33 @@
+{
+  "batch_id": "bat_01J00000000000000000000001",
+  "causation_id": null,
+  "created_at": "2026-08-12T12:00:00Z",
+  "event_count": 1,
+  "expected_revisions": [
+    {
+      "aggregate_id": "nod_01J00000000000000000000001",
+      "revision": 0
+    }
+  ],
+  "first_seq": 1,
+  "hash_domain": "ayran.journal.begin.v1",
+  "idempotency_key": "fixture:journal:1",
+  "journal_format_version": 1,
+  "operation_id": "op_01J00000000000000000000020",
+  "previous_commit_hash": null,
+  "previous_event_hash": null,
+  "record_type": "batch.begin",
+  "request_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "stream": {
+    "namespace": "target",
+    "run_id": "run_01J00000000000000000000001",
+    "stream_id": "str_01J00000000000000000000001",
+    "target_identity": {
+      "commit": "1111111111111111111111111111111111111111",
+      "scope_id": "scp_01J00000000000000000000001",
+      "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "target_id": "tgt_01J00000000000000000000001"
+    },
+    "target_key": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

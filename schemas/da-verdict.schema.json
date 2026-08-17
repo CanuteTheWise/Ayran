@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/da-verdict.schema.json",
+  "title": "DAVerdict",
+  "description": "Independent Devil's Advocate Gate A/B disposition. Decision and resulting hypothesis status remain distinct vocabularies.",
+  "x-ayran-schema-version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "verdict_id",
+    "created_at",
+    "run_id",
+    "target_identity",
+    "gate",
+    "decision",
+    "resulting_hypothesis_status",
+    "hypothesis_id",
+    "evidence_ids",
+    "falsification_attempts",
+    "causal_chain",
+    "dissent",
+    "confidence",
+    "deterministic_rule_version",
+    "reviewer",
+    "independent_from",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "verdict_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "gate": { "type": "string", "enum": ["A", "B"] },
+    "decision": {
+      "type": "string",
+      "enum": ["advance", "revise", "reject", "duplicate", "insufficient"]
+    },
+    "resulting_hypothesis_status": {
+      "$ref": "common.schema.json#/$defs/HypothesisStatus"
+    },
+    "hypothesis_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "evidence_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "falsification_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question",
+          "result",
+          "evidence_ids",
+          "untried_dimensions"
+        ],
+        "properties": {
+          "question": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "result": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "evidence_ids": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+          "untried_dimensions": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "maxItems": 64
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "causal_chain": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "dissent": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+      "maxItems": 32
+    },
+    "confidence": { "$ref": "common.schema.json#/$defs/Confidence" },
+    "deterministic_rule_version": {
+      "$ref": "common.schema.json#/$defs/SemVer"
+    },
+    "reviewer": { "$ref": "actor.schema.json" },
+    "independent_from": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "gate": { "const": "A" },
+          "decision": { "const": "advance" }
+        },
+        "required": ["gate", "decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "poc_worthy" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "gate": { "const": "B" },
+          "decision": { "const": "advance" }
+        },
+        "required": ["gate", "decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "defect_pinned" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "reject" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "falsified" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "duplicate" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "duplicate_known_issue" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "insufficient" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "needs_missing_fact" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "revise" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "resulting_hypothesis_status": { "const": "needs_reformulation" }
+        }
+      }
+    }
+  ]
+}

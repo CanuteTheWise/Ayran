@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "sequence": ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"],
+  "seeds": [7, 13, 21],
+  "comparisons": [
+    "external_hound",
+    "target_only",
+    "target_global",
+    "target_global_learning",
+    "specialist_aware",
+    "specialist_blind"
+  ],
+  "execution_mode": "sealed_fixture_offline",
+  "network": false
+}

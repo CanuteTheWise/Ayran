@@ -1,0 +1,13 @@
+record_type: finding_pattern
+canonical_key: krait-checks-patterns
+title: Checks and patterns as applicability predicates
+summary: Pattern corpus entries must carry applicability and non-applicability. Self-reported scores are not evidence.
+language: solidity
+applicability_predicates:
+  - pattern-match-candidate
+code_signals:
+  - call.value
+  - delegatecall
+non_applicability:
+  - pattern without a reachable path
+completeness: "0.6"

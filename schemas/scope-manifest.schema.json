@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ayran.dev/v1/scope-manifest.schema.json",
+  "title": "ScopeManifest",
+  "description": "Immutable approved target scope and action policy. Deny rules always override allows.",
+  "x-ayran-schema-version": "1.0.0",
+  "$defs": {
+    "Action": {
+      "type": "string",
+      "enum": [
+        "read_source",
+        "read_spec",
+        "graph_read",
+        "graph_write",
+        "compile_local",
+        "test_local",
+        "fuzz_local",
+        "read_only_rpc",
+        "approved_api_query",
+        "render_local_report"
+      ]
+    },
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "effect", "action", "resource"],
+      "properties": {
+        "rule_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+        "effect": { "type": "string", "enum": ["allow", "deny"] },
+        "action": { "$ref": "#/$defs/Action" },
+        "resource": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope_id",
+    "created_at",
+    "run_id",
+    "revision",
+    "target_identity",
+    "included_roots",
+    "excluded_roots",
+    "deployments",
+    "chains",
+    "fork_blocks",
+    "rules",
+    "deny_overrides",
+    "allowed_hosts",
+    "allowed_endpoints",
+    "allowed_tools",
+    "write_roots",
+    "secret_aliases",
+    "budgets",
+    "approval_rules",
+    "authorization",
+    "valid_from",
+    "valid_until",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "scope_id": { "$ref": "common.schema.json#/$defs/Identifier" },
+    "created_at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "run_id": { "$ref": "common.schema.json#/$defs/RunId" },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "target_identity": { "$ref": "common.schema.json#/$defs/TargetIdentity" },
+    "included_roots": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/RelativePath" },
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "excluded_roots": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/RelativePath" },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "deployments": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "chains": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "fork_blocks": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Rule" },
+      "minItems": 1,
+      "maxItems": 256
+    },
+    "deny_overrides": { "type": "boolean", "const": true },
+    "allowed_hosts": {
+      "type": "array",
+      "items": { "type": "string", "format": "hostname" },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "allowed_endpoints": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Uri" },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "allowed_tools": { "$ref": "common.schema.json#/$defs/ReferenceList" },
+    "write_roots": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/RelativePath" },
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "secret_aliases": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}_REF$" },
+      "maxItems": 16,
+      "uniqueItems": true
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_minutes", "token_units", "tool_seconds", "disk_mib"],
+      "properties": {
+        "wall_minutes": { "type": "integer", "minimum": 1, "maximum": 10080 },
+        "token_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000000
+        },
+        "tool_seconds": { "type": "integer", "minimum": 0, "maximum": 604800 },
+        "disk_mib": { "type": "integer", "minimum": 1, "maximum": 1048576 }
+      }
+    },
+    "approval_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action_class", "approval"],
+        "properties": {
+          "action_class": {
+            "type": "string",
+            "enum": [
+              "install_tool",
+              "add_endpoint",
+              "expand_scope",
+              "external_upload",
+              "submission",
+              "signing",
+              "spending",
+              "transaction_broadcast"
+            ]
+          },
+          "approval": { "type": "string", "const": "explicit-human" }
+        }
+      },
+      "minItems": 8,
+      "maxItems": 8
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_by", "approved_scope_hash", "approved_at"],
+      "properties": {
+        "approved_by": { "$ref": "actor.schema.json" },
+        "approved_scope_hash": { "$ref": "common.schema.json#/$defs/Hash" },
+        "approved_at": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "valid_from": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "valid_until": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "provenance": {
+      "type": "array",
+      "items": { "$ref": "provenance.schema.json" },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "integrity": { "$ref": "integrity.schema.json" }
+  }
+}

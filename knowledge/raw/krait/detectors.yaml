@@ -1,0 +1,16 @@
+record_type: reasoning_lens
+canonical_key: krait-detector-modules
+title: Detector modules as leads
+summary: Detector output is a lead. It never raises evidence grade by itself. Never run Krait's Anthropic scheduler.
+language: solidity
+applicability_predicates:
+  - static-detector-available
+questions:
+  - Which detector fired, on which span, and what would falsify it?
+required_artifacts:
+  - detector-report
+stop_conditions:
+  - promoting a detector hit to observed
+false_positive_traps:
+  - Heuristic names that match comments only
+completeness: "0.7"

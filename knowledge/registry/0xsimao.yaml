@@ -1,0 +1,22 @@
+source_id: 0xsimao
+display_name: 0xsimao accounting lenses
+source_type: repository
+origin: https://github.com/0xsimao/0xsimao-ai
+pin:
+  commit: 3f81e5803174182a7db07eca87849d2b3d571113
+  tag: ""
+  archive_sha256: ""
+license:
+  spdx_id: NOASSERTION
+  attribution_required: true
+  local_use: true
+  redistribution: false
+  retention_constraint: none
+trust_tier: curated_external
+reproduction_status: unverified
+contamination_flags: []
+contamination_registry: production
+phase: proposed
+authors:
+  - 0xsimao
+notes: Twelve accounting lenses as reasoning lenses. Upstream self-evaluation is labeled, not evidence.

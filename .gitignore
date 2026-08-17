@@ -1,0 +1,63 @@
+# Reproducible release output and vendor downloads
+dist/
+vendor/cache/
+
+# Private operator, research, and memory artifacts (local workspace only)
+LEAD-OPERATIONS-MANUAL.md
+chatgpt-memory.jsonl
+Potential Repos to use for harness.txt
+docs/ayran-final-engineering-blueprint.md
+docs/intelligence-layer-repository-assessment-and-integration-plan.md
+docs/development/*-implementation-record.md
+docs/development/evidence/
+.cursor/
+.zcode/
+
+# Original logo filename; the repo copy lives at docs/logo.png
+/Ayran logo _ Persian mosaic.png
+
+# Dependency environments
+node_modules/
+.venv/
+venv/
+.uv/
+
+# Generated test/build output (generated contract source is intentionally checked in)
+var/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+coverage/
+.coverage
+htmlcov/
+test-results/
+
+# Language/tool caches
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+.npm/
+
+# Runtime state, journals, sockets, databases, and secrets never belong here
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.sock
+*.socket
+*.journal
+*.jsonl.tmp
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Local editor/OS state
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

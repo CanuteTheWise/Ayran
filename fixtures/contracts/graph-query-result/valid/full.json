@@ -1,0 +1,72 @@
+{
+  "canonical_params": {
+    "entity_id": "nod_01J00000000000000000000001"
+  },
+  "created_at": "2026-08-12T12:00:00Z",
+  "index_degraded": true,
+  "query_api_version": "1.0.0",
+  "query_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "query_id": "qry_01J00000000000000000000020",
+  "query_name": "entity.get",
+  "records": [
+    {
+      "kind": "node",
+      "value": {
+        "confidence": 1.0,
+        "created_at": "2026-08-12T12:00:00Z",
+        "evidence_grade": "lead",
+        "evidence_refs": [],
+        "integrity": {
+          "algorithm": "sha256",
+          "canonicalization": "rfc8785",
+          "content_hash": "sha256:57be63a9ee1411c7d6b255fa622dfa2295d1a2c0480657171c1bc0b9e1eb8931",
+          "excluded_fields": [
+            "integrity.content_hash"
+          ]
+        },
+        "namespace": "target",
+        "node_id": "nod_01J00000000000000000000001",
+        "node_type": "Contract",
+        "properties": [],
+        "provenance": [
+          {
+            "license_or_terms": "private-test-fixture",
+            "provenance_id": "prv_01J00000000000000000000001",
+            "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "retrieved_at": "2026-08-12T12:00:00Z",
+            "source_uri": "https://fixtures.ayran.dev/m0",
+            "source_version": "fixture-v1",
+            "transformation_lineage": []
+          }
+        ],
+        "revision": 1,
+        "run_id": "run_01J00000000000000000000001",
+        "schema_version": "1.0.0",
+        "source_locator": "target/src/Vault.sol:1",
+        "status": "active",
+        "trust_class": "deterministic_tool",
+        "valid_from_event": "evt_01J00000000000000000000020"
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "snapshot": {
+    "as_of_seq": 1,
+    "event_hash": "sha256:a3aa3d716159905e183ff846c2bcbccb4a48a71a49bbfd772cc65d49f8b0bc94",
+    "migration_version": 1,
+    "projection_schema_version": "1.0.0"
+  },
+  "stream": {
+    "namespace": "target",
+    "run_id": "run_01J00000000000000000000001",
+    "stream_id": "str_01J00000000000000000000001",
+    "target_identity": {
+      "commit": "1111111111111111111111111111111111111111",
+      "scope_id": "scp_01J00000000000000000000001",
+      "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "target_id": "tgt_01J00000000000000000000001"
+    },
+    "target_key": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "truncated": true
+}

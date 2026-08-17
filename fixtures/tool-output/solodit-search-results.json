@@ -1,0 +1,22 @@
+{
+  "page": 1,
+  "next_cursor": "page-2",
+  "results": [
+    {
+      "title": "Reentrancy in callback after external token transfer",
+      "severity": "high",
+      "category": "reentrancy",
+      "protocol": "generic-amm",
+      "source_url": "https://solodit.cyfrin.io/issues/example-reentrancy-001",
+      "record_id": "solodit-reentrancy-001"
+    },
+    {
+      "title": "Oracle price can be stale across a multi-block window",
+      "severity": "medium",
+      "category": "oracle",
+      "protocol": "generic-lending",
+      "source_url": "https://solodit.cyfrin.io/issues/example-oracle-002",
+      "record_id": "solodit-oracle-002"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "actor": {
+    "id": "ayran.fixture",
+    "kind": "service",
+    "version": "1.0.0"
+  },
+  "aggregate_id": "hyp_01J00000000000000000000001",
+  "aggregate_version": 1,
+  "config_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "created_at": "2026-08-12T12:00:00Z",
+  "event_hash": "sha256:ead10f2d2c556baf10e7a8841e31b1392dc6264a9d19008493f1b2b1698eea38",
+  "event_id": "evt_01J00000000000000000000001",
+  "event_type": "hypothesis.created",
+  "graph": "target",
+  "idempotency_key": "fixture:event:1",
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:ead10f2d2c556baf10e7a8841e31b1392dc6264a9d19008493f1b2b1698eea38",
+    "excluded_fields": [
+      "integrity.content_hash",
+      "event_hash"
+    ]
+  },
+  "operation_id": "op_01J00000000000000000000001",
+  "payload": {
+    "content_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "contract_id": "hypothesis@1.0.0",
+    "object_id": "hyp_01J00000000000000000000001"
+  },
+  "previous_event_hash": null,
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "seq": 1,
+  "source_version": "target@fixture-v1",
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  }
+}

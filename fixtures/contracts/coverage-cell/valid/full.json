@@ -1,0 +1,58 @@
+{
+  "achieved_evidence_grade": "observed",
+  "attempted_origins": [
+    "model_novel",
+    "tool"
+  ],
+  "attempted_tools": [
+    "cap_01J00000000000000000000001"
+  ],
+  "blockers": [],
+  "coverage_cell_id": "cov_01J00000000000000000000001",
+  "created_at": "2026-08-12T12:00:00Z",
+  "depth": "tested",
+  "dimension": "share accounting direct donation",
+  "entry_point_ids": [
+    "nod_01J00000000000000000000002"
+  ],
+  "examined_result": "Direct donation path identified; exploitability not yet tested",
+  "gaps": [],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:d8a31410369f5b7c40bb02553312cb5e78bca32263b8ecd2928b3b7262083b6d",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "invariant_ids": [
+    "inv_01J00000000000000000000001"
+  ],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "status": "examined",
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "target_refs": [
+    "nod_01J00000000000000000000001"
+  ],
+  "untried_dimensions": [
+    "rounding boundaries"
+  ],
+  "updated_at": "2026-08-12T12:00:00Z"
+}

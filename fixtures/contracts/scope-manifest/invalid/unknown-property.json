@@ -1,0 +1,113 @@
+{
+  "allowed_endpoints": [],
+  "allowed_hosts": [],
+  "allowed_tools": [],
+  "approval_rules": [
+    {
+      "action_class": "install_tool",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "add_endpoint",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "expand_scope",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "external_upload",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "submission",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "signing",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "spending",
+      "approval": "explicit-human"
+    },
+    {
+      "action_class": "transaction_broadcast",
+      "approval": "explicit-human"
+    }
+  ],
+  "authorization": {
+    "approved_at": "2026-08-12T12:00:00Z",
+    "approved_by": {
+      "id": "operator",
+      "kind": "human",
+      "version": "1.0.0"
+    },
+    "approved_scope_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "budgets": {
+    "disk_mib": 8192,
+    "token_units": 100000,
+    "tool_seconds": 7200,
+    "wall_minutes": 240
+  },
+  "chains": [
+    1
+  ],
+  "created_at": "2026-08-12T12:00:00Z",
+  "deny_overrides": true,
+  "deployments": [],
+  "excluded_roots": [
+    "target/vendor"
+  ],
+  "fork_blocks": [
+    20000000
+  ],
+  "included_roots": [
+    "target/src"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:25ccc2a8530751fbf69167aa2b198922415ee5f04e7fd9249bdf73b44283e45d",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "revision": 1,
+  "rules": [
+    {
+      "action": "read_source",
+      "effect": "allow",
+      "resource": "target/src",
+      "rule_id": "rul_01J00000000000000000000001"
+    }
+  ],
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "scope_id": "scp_01J00000000000000000000001",
+  "secret_aliases": [],
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "unexpected_security_field": "reject",
+  "valid_from": "2026-08-12T12:00:00Z",
+  "valid_until": "2026-08-13T12:00:00Z",
+  "write_roots": [
+    "run/work"
+  ]
+}

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ayran-contracts"
+version = "0.7.0"
+description = "Ayran contracts and canonical Graph Fabric"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "jsonschema==4.26.0",
+  "pydantic==2.13.4",
+  "referencing==0.37.0",
+  "rfc8785==0.1.4",
+]
+
+[project.scripts]
+ayran = "ayran.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ayran"]

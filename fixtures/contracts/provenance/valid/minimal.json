@@ -1,0 +1,9 @@
+{
+  "license_or_terms": "private-test-fixture",
+  "provenance_id": "prv_01J00000000000000000000001",
+  "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "retrieved_at": "2026-08-12T12:00:00Z",
+  "source_uri": "https://fixtures.ayran.dev/m0",
+  "source_version": "fixture-v1",
+  "transformation_lineage": []
+}

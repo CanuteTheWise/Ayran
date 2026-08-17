@@ -1,0 +1,57 @@
+{
+  "affected_code": [
+    "target/src/Vault.sol:10"
+  ],
+  "attacker_model": "Unprivileged user with underlying assets",
+  "confidence": 0.8,
+  "created_at": "2026-08-12T12:00:00Z",
+  "evidence_ids": [
+    "evd_01J00000000000000000000001"
+  ],
+  "finding_id": "fnd_01J00000000000000000000001",
+  "impact": {
+    "assumptions": [
+      "market exists"
+    ],
+    "equation": "attacker_gain = victim_loss",
+    "kind": "theft",
+    "lower_bound": "0",
+    "upper_bound": null
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "content_hash": "sha256:51bd0a8015cd79dc39aa1d4002bf96640617a24b429276a9445a745d762813a7",
+    "excluded_fields": [
+      "integrity.content_hash"
+    ]
+  },
+  "preconditions": [
+    "Direct transfer is possible"
+  ],
+  "provenance": [
+    {
+      "license_or_terms": "private-test-fixture",
+      "provenance_id": "prv_01J00000000000000000000001",
+      "raw_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieved_at": "2026-08-12T12:00:00Z",
+      "source_uri": "https://fixtures.ayran.dev/m0",
+      "source_version": "fixture-v1",
+      "transformation_lineage": []
+    }
+  ],
+  "root_cause": "Cached assets omit direct transfers",
+  "run_id": "run_01J00000000000000000000001",
+  "schema_version": "1.0.0",
+  "status": "candidate",
+  "target_identity": {
+    "commit": "1111111111111111111111111111111111111111",
+    "scope_id": "scp_01J00000000000000000000001",
+    "source_tree_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_id": "tgt_01J00000000000000000000001"
+  },
+  "title": "Donation may dilute vault shares",
+  "trust_class": "runtime_observation",
+  "unexpected_security_field": "reject",
+  "violated_invariant": "Shares preserve proportional ownership"
+}

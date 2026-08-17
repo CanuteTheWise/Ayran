@@ -1,0 +1,16 @@
+record_type: reasoning_lens
+canonical_key: krait-attack-angles
+title: Attack-angle catalogue
+summary: Named angles (reentrancy, oracle, auth, inflation) are routing hints, not a closed hypothesis list.
+language: solidity
+applicability_predicates:
+  - attack-surface-mapped
+questions:
+  - Which angle is applicable given target features, and which are explicitly not?
+required_artifacts:
+  - attack-surface-map
+stop_conditions:
+  - enumerating all catalogue rows into context
+false_positive_traps:
+  - Angle with no matching target feature
+completeness: "0.7"

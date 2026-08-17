@@ -1,0 +1,9 @@
+{
+  "contracts": {
+    "Hello.sol:Hello": {
+      "abi": [{"type": "function", "name": "greet", "inputs": [], "outputs": [{"type": "string"}]}],
+      "bin": "6080604052348015600f57600080fd5b50603e80601d6000396000f3fe",
+      "hashes": {"greet()": "cfae3217"}
+    }
+  }
+}

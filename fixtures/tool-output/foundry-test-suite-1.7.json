@@ -1,0 +1,32 @@
+{
+  "test/Counter.t.sol:CounterTest": {
+    "duration": "7ms",
+    "test_results": {
+      "testMismatch()": {
+        "status": "Failure",
+        "reason": "assertion failed: 1 != 2",
+        "counterexample": null,
+        "logs": [],
+        "decoded_logs": [],
+        "kind": {"Unit": {"gas": 428}},
+        "traces": [],
+        "labeled_addresses": {},
+        "breakpoints": {},
+        "gas_snapshots": {}
+      },
+      "testPass()": {
+        "status": "Success",
+        "reason": null,
+        "counterexample": null,
+        "logs": [],
+        "decoded_logs": [],
+        "kind": {"Unit": {"gas": 116750}},
+        "traces": [],
+        "labeled_addresses": {},
+        "breakpoints": {},
+        "gas_snapshots": {}
+      }
+    },
+    "warnings": []
+  }
+}

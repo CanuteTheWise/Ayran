@@ -1,0 +1,16 @@
+record_type: reasoning_lens
+canonical_key: lens-flow-completeness
+title: Flow completeness lens
+summary: Every inbound asset, share, and authorization must have a matching outbound or sink.
+language: solidity
+applicability_predicates:
+  - value-flow
+questions:
+  - Which path mints shares without taking assets, or the reverse?
+required_artifacts:
+  - value-flow-map
+stop_conditions:
+  - incomplete flow without a named missing edge
+false_positive_traps:
+  - Intentional sink documented as protocol fee
+completeness: "0.8"
