@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ayran.context.ids import content_id
 from ayran.evidence.actors import ACTOR_EVIDENCE
 from ayran.evidence.service import transition
 from ayran.hypotheses.builders import build_hypothesis
@@ -54,6 +55,155 @@ GATE_B_PASS: dict[str, Any] = {
     "fix_evidence_ids": ["evd_01J00000000000000000000003"],
     "evidence_ids": ["evd_01J00000000000000000000001"],
 }
+
+# R2: executed-run fixtures (S9.3 c2). The three decisive runs — vulnerable
+# replay, patched control, revert-mutation — encoded as recorded blocks whose
+# forge JSON payloads the ScriptedRunner funnels through the same parse/hash/
+# classify pipeline a live ForgeRunner uses. Booleans never decide anything.
+REENTRANT_MATCH_TEST = "test_exploit"
+POC_SOURCE_BYTES = (
+    b"contract ExploitTest {\n"
+    b"  function test_exploit() public {\n"
+    b"    // attacker drains the vault via re-entering withdraw\n"
+    b"  }\n"
+    b"}\n"
+)
+TRACE_OUTPUT_BYTES = (
+    b"[FAIL. Reason: assertion violated: attacker net did not increase] "
+    b"ExploitTest.test_exploit (gas: 39110)\n"
+)
+MUTATED_SOURCE_BYTES = (
+    b"contract ReentrantVault {\n"
+    b"  // revert-mutation: the candidate CEI fix is reverted to the vulnerable order\n"
+    b"}\n"
+)
+
+
+def forge_json_suite(cases: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
+    """Build a forge ``--json`` payload parse_forge_json understands."""
+
+    return {"test_results": cases}
+
+
+REPLAY_FORGE_JSON = forge_json_suite(
+    {
+        "ExploitTest": {
+            REENTRANT_MATCH_TEST: {"status": "success", "gas": 48213},
+        }
+    }
+)
+CONTROL_FORGE_JSON = forge_json_suite(
+    {
+        "ExploitTest": {
+            REENTRANT_MATCH_TEST: {
+                "status": "fail",
+                "reason": "assertion violated: attacker net did not increase",
+                "gas": 39110,
+            },
+            "test_feature_deposit": {"status": "success", "gas": 30112},
+        }
+    }
+)
+REVERT_FORGE_JSON = forge_json_suite(
+    {
+        "ExploitTest": {
+            "test_pinning_blocks_exploit": {
+                "status": "fail",
+                "reason": "assertion violated: exploit re-enabled after fix revert",
+                "gas": 40010,
+            }
+        }
+    }
+)
+
+_REPLAY_COMMAND = "forge test --match-test test_exploit --json"
+_REPLAY_ARGV = ["forge", "test", "--match-test", "test_exploit", "--json"]
+
+REPLAY_RUN_BLOCK: dict[str, Any] = {
+    "command": _REPLAY_COMMAND,
+    "argv": list(_REPLAY_ARGV),
+    "cwd": "sandbox/reentrant-vault-replay",
+    "exit_code": 0,
+    "duration_ms": 912,
+    "stdout_json": REPLAY_FORGE_JSON,
+    "artifact_ids": ["evd_01J00000000000000000000001"],
+}
+CONTROL_RUN_BLOCK: dict[str, Any] = {
+    "command": _REPLAY_COMMAND,
+    "argv": list(_REPLAY_ARGV),
+    "cwd": "sandbox/reentrant-vault-patched",
+    "exit_code": 1,
+    "duration_ms": 844,
+    "stdout_json": CONTROL_FORGE_JSON,
+    "coverage": 0.93,
+    "artifact_ids": ["evd_01J00000000000000000000002"],
+}
+REVERT_RUN_BLOCK: dict[str, Any] = {
+    "command": _REPLAY_COMMAND,
+    "argv": list(_REPLAY_ARGV),
+    "cwd": "sandbox/reentrant-vault-reverted",
+    "exit_code": 1,
+    "duration_ms": 701,
+    "stdout_json": REVERT_FORGE_JSON,
+    "artifact_ids": ["evd_01J00000000000000000000003"],
+}
+
+GATE_B_EXECUTED: dict[str, Any] = {
+    "match_test": REENTRANT_MATCH_TEST,
+    "clean_replay": dict(REPLAY_RUN_BLOCK),
+    "numerical_assertions": {**REPLAY_RUN_BLOCK, "artifact_ids": []},
+    "negative_controls": dict(CONTROL_RUN_BLOCK),
+    "defect_removal": dict(CONTROL_RUN_BLOCK),
+    "fix_efficacy": dict(REVERT_RUN_BLOCK),
+    "patch": {
+        "files": [
+            {
+                "path": "src/ReentrantVault.sol",
+                "content": "contract ReentrantVault { /* CEI patch */ }",
+            }
+        ]
+    },
+    "artifacts": {
+        "poc_source": POC_SOURCE_BYTES,
+        "trace_output": TRACE_OUTPUT_BYTES,
+        "mutated_source": MUTATED_SOURCE_BYTES,
+    },
+    "alternate_paths": {"detail": "repeatable; unique trigger is fallback reenter"},
+    "feasibility_scope_severity": {"detail": "unprivileged, in-scope, unique"},
+    "negative_control_ids": ["evd_01J00000000000000000000002"],
+    "fix_evidence_ids": ["evd_01J00000000000000000000003"],
+    "evidence_ids": ["evd_01J00000000000000000000001"],
+}
+
+
+def executed_replay_hash() -> str:
+    """The canonical-summary hash of the replay fixture run — the value the
+    original ToolRun/PocRun record must carry for the E4 comparison."""
+
+    from ayran.gates.gate_b_mechanical import (
+        ScriptedRunner,
+        execute_runs,
+    )
+
+    runs = execute_runs({"clean_replay": REPLAY_RUN_BLOCK}, ScriptedRunner())
+    return runs.results["replay"].stdout_sha256
+
+
+def recorded_poc_for_executed(hypothesis_id: str) -> dict[str, Any]:
+    """PocRun ``recorded=`` payload whose replay hash matches the replay run."""
+
+    return {
+        "status": "succeeded",
+        "stdout": "attacker_net=1000000000000000000",
+        "result_hash": executed_replay_hash(),
+        "replay_hash": executed_replay_hash(),
+        "replay_matched": True,
+        "one_command": _REPLAY_COMMAND,
+        "tool_run_id": content_id("trn", hypothesis_id, "poc"),
+        "evidence_ids": [content_id("evd", hypothesis_id, "poc")],
+        "negative_control_ids": [content_id("evd", hypothesis_id, "neg")],
+        "fix_evidence_ids": [content_id("evd", hypothesis_id, "fix")],
+    }
 
 # R1: scripted challenger outputs (S9.2 transport seam). Gate A verdicts enter
 # ONLY as these structurally complete submissions under a per-spawn credential.

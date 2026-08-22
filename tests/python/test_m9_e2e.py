@@ -21,12 +21,13 @@ from ayran.graph.recovery import GraphStore
 from m6_fixtures import (
     CHALLENGER_SUBMISSION_FALSIFIED,
     CHALLENGER_SUBMISSION_POC_WORTHY,
-    GATE_B_PASS,
+    GATE_B_EXECUTED,
     REENTRANT_SOURCE,
     TRUE_DEFECT_EVIDENCE,
     challenger_gate_a,
     open_store,
     promote_supported,
+    recorded_poc_for_executed,
     seed_hypothesis,
 )
 
@@ -45,20 +46,10 @@ def _validated_finding(store: GraphStore) -> dict[str, str]:
     poc = poc_run(
         store,
         hid,
-        recorded={
-            "status": "succeeded",
-            "stdout": "attacker_net=1000000000000000000",
-            "result_hash": "sha256:" + "ab" * 32,
-            "replay_hash": "sha256:" + "ab" * 32,
-            "replay_matched": True,
-            "one_command": "forge test --match-test test_exploit --json",
-            "tool_run_id": content_id("trn", hid, "poc"),
-            "evidence_ids": [content_id("evd", hid, "poc")],
-            "negative_control_ids": [content_id("evd", hid, "neg")],
-            "fix_evidence_ids": [content_id("evd", hid, "fix")],
-        },
+        recorded=recorded_poc_for_executed(hid),
     )
-    b = gate_b(store, hid, obligations=GATE_B_PASS, poc_id=str(poc["poc_id"]))
+    b = gate_b(store, hid, obligations=GATE_B_EXECUTED, poc_id=str(poc["poc_id"]))
+    assert b["verdict"] == "defect_pinned"
     impact = impact_assess(store, hid, assumptions={"unit_loss": "1", "repetitions": 1})
     severity = severity_assess(store, hid, impact=impact)
     transition(

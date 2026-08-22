@@ -1,4 +1,17 @@
-"""Gate B — post-PoC causal falsification. No model calls."""
+"""Gate B — post-PoC causal falsification. No model calls.
+
+R2 (spec §5.6, S9.3, INV-5.6/5.7/5.10): the executable profile decides every
+obligation from EXECUTED artifacts through :mod:`ayran.gates.gate_b_mechanical`
+— three real runs (vulnerable replay, patched control, revert-mutation), each
+hashed over a canonicalized assertion summary. The boolean-honor path is
+deleted: a bare ``{"passed": true}`` raises ``OBLIGATION_FORGERY_REJECTED``
+at parse time (S9.3 c1), and any executable block lacking ``command`` +
+``exit_code`` forces ``needs_reformulation``.
+
+The ``governed_proof`` profile and its contest-policy gate survive unchanged
+in meaning: proof-based qualification stays flag-evaluated only under an
+explicit contest policy that allows non-executable qualification.
+"""
 
 from __future__ import annotations
 
@@ -7,13 +20,30 @@ from typing import Any
 from ayran.context.contracts import provenance_record, seal
 from ayran.context.ids import content_id
 from ayran.evidence.actors import ACTOR_GATE_B
-from ayran.evidence.errors import EVIDENCE_CEILING, GATE_PRECONDITION, EvidenceError
+from ayran.evidence.errors import (
+    EVIDENCE_CEILING,
+    GATE_PRECONDITION,
+    OBLIGATION_FORGERY_REJECTED,
+    EvidenceError,
+)
 from ayran.evidence.types import (
     DECISION_TO_SCHEMA,
     GATE_B_DECISIONS,
     GATE_B_OBLIGATIONS,
     RULE_VERSION,
     SOURCE_URI,
+)
+from ayran.gates.gate_b_mechanical import (
+    DEFAULT_MATCH_TEST,
+    JUDGMENT_OBLIGATIONS,
+    KRAIT_UNPINNED,
+    MechanicalRunner,
+    ScriptedRunner,
+    artifact_hashes,
+    classify_runs,
+    detect_forgery,
+    execute_runs,
+    patch_scope_violations,
 )
 
 
@@ -24,6 +54,12 @@ def _flag(block: dict[str, Any] | None, key: str = "passed") -> bool:
 
 
 def evaluate_obligations(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Governed-proof obligation flag evaluation (non-executable profile only).
+
+    The executable profile NEVER consults these flags — its obligations are
+    decided mechanically from executed runs in ``gate_b_mechanical``.
+    """
+
     results: dict[str, dict[str, Any]] = {}
     for name in GATE_B_OBLIGATIONS:
         block = payload.get(name)
@@ -61,42 +97,13 @@ def decide_verdict(results: dict[str, dict[str, Any]], *, profile: str) -> str:
         if missing_proof:
             return "needs_reformulation"
         return "defect_pinned"
-
-    unspecified = [name for name, item in results.items() if item.get("unspecified")]
-    if unspecified:
-        return "needs_reformulation"
-    if any(item.get("wrong_reason") for item in results.values()):
-        return "needs_reformulation"
-    removal = results.get("defect_removal") or {}
-    if removal.get("exploit_persists"):
-        return "needs_reformulation"
-    efficacy = results.get("fix_efficacy") or {}
-    if efficacy.get("feature_disabled"):
-        return "needs_reformulation"
-    if not _flag(results.get("clean_replay")):
-        return "needs_reformulation"
-    if not _flag(results.get("numerical_assertions")):
-        return "needs_reformulation"
-    if not _flag(results.get("negative_controls")):
-        return "needs_reformulation"
-    if not _flag(results.get("defect_removal")) or not _flag(results.get("fix_efficacy")):
-        return "needs_reformulation"
-    if not _flag(results.get("alternate_paths")):
-        return "needs_reformulation"
-    if not _flag(results.get("independent_skeptic")):
-        return "needs_reformulation"
-    # Deployment identity is required only when claimed.
-    identity = results.get("deployment_identity") or {}
-    if identity.get("claimed") and not _flag(identity):
-        return "needs_reformulation"
-    if not _flag(results.get("feasibility_scope_severity")):
-        return "needs_reformulation"
-    if any(item.get("falsified") for item in results.values()):
-        return "falsified"
-    replay = results.get("clean_replay") or {}
-    if replay.get("mismatch"):
-        return "falsified"
-    return "defect_pinned"
+    # The executable honor ladder is deleted (§5.6); executable verdicts are
+    # derived mechanically by gate_b_mechanical.classify_runs.
+    raise EvidenceError(
+        GATE_PRECONDITION,
+        "decide_verdict evaluates only the governed_proof profile; "
+        "executable verdicts come from executed artifacts",
+    )
 
 
 def build_verdict_record(
@@ -160,6 +167,69 @@ def build_verdict_record(
     return seal(record)
 
 
+def build_v2_verdict_record(
+    *,
+    hypothesis: dict[str, Any],
+    verdict: str,
+    results: dict[str, dict[str, Any]],
+    classification: Any,
+    created_at: str,
+    evidence_ids: list[str],
+    profile: str,
+    artifact_hash_entries: list[dict[str, str]],
+    judgment_payloads: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Schema v2 verdict record: everything v1 carried, plus the Krait stamp,
+    recomputable artifact hashes, per-obligation executed blocks, and judgment
+    obligations recorded verbatim (never gating, §5.6 schema additions)."""
+
+    summary = build_verdict_record(
+        hypothesis=hypothesis,
+        verdict=verdict,
+        results=results,
+        created_at=created_at,
+        evidence_ids=evidence_ids,
+        profile=profile,
+    )
+    record = dict(summary)
+    record["schema_version"] = "2.0.0"
+    record["krait_stamp"] = classification.krait_stamp
+    record["artifact_hashes"] = artifact_hash_entries
+    record["obligation_executions"] = dict(classification.executed_blocks)
+    record["judgment_obligations"] = {
+        name: dict(block) for name, block in judgment_payloads.items() if isinstance(block, dict)
+    }
+    record["pinning"] = {
+        "pinned": bool(classification.pinned),
+        "replay_reproduced": bool(classification.replay_reproduced),
+        "reasons": list(classification.reasons)[:32],
+    }
+    return seal(record)
+
+
+def _governed_refusal(profile: str, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0.0",
+        "verdict": "needs_reformulation",
+        "profile": profile,
+        "label": "proof_based",
+        "obligations": evaluate_obligations(payload),
+        "record": None,
+        "reason": "governed_proof requires contest policy to allow non-executable qualification",
+    }
+
+
+def _expected_replay_hash(payload: dict[str, Any], poc: dict[str, Any] | None) -> str | None:
+    block = payload.get("clean_replay")
+    if isinstance(block, dict) and isinstance(block.get("expected_replay_hash"), str):
+        return str(block["expected_replay_hash"])
+    if isinstance(poc, dict):
+        candidate = str(poc.get("replay_hash") or "")
+        if candidate.startswith("sha256:"):
+            return candidate
+    return None
+
+
 def run_gate_b(
     hypothesis: dict[str, Any],
     *,
@@ -167,6 +237,7 @@ def run_gate_b(
     poc: dict[str, Any] | None = None,
     created_at: str | None = None,
     profile: str = "executable",
+    runner: MechanicalRunner | None = None,
 ) -> dict[str, Any]:
     status = str(hypothesis.get("status") or "lead")
     grade = str(hypothesis.get("evidence_grade") or "lead")
@@ -183,29 +254,110 @@ def run_gate_b(
             details={"evidence_grade": grade},
         )
     payload = dict(obligations or {})
-    if poc and not payload.get("clean_replay"):
-        replay_ok = str(poc.get("replay_hash") or "") == str(poc.get("result_hash") or "")
-        if poc.get("replay_matched") is True:
-            replay_ok = True
-        payload["clean_replay"] = {
-            "passed": replay_ok and str(poc.get("status") or "") == "succeeded",
-            "detail": "replay hash compared to original ToolRun",
-            "mismatch": bool(poc.get("replay_hash") and not replay_ok),
-        }
     if profile not in {"executable", "governed_proof"}:
         profile = "executable"
-    if profile == "governed_proof" and not payload.get("contest_policy_allows_proof"):
+    if profile == "governed_proof":
+        # Proof-based qualification survives with its meaning unchanged: the
+        # contest-policy gate decides before any obligation is evaluated.
+        if not payload.get("contest_policy_allows_proof"):
+            return _governed_refusal(profile, payload)
+        results = evaluate_obligations(payload)
+        verdict = decide_verdict(results, profile=profile)
+        if verdict not in GATE_B_DECISIONS:
+            verdict = "needs_reformulation"
+        evidence_ids = [
+            str(item)
+            for item in (payload.get("evidence_ids") or (poc or {}).get("evidence_ids") or [])
+            if isinstance(item, str)
+        ]
+        stamp = created_at or str(hypothesis.get("created_at") or "")
+        record = build_verdict_record(
+            hypothesis=hypothesis,
+            verdict=verdict,
+            results=results,
+            created_at=stamp,
+            evidence_ids=evidence_ids,
+            profile=profile,
+        )
         return {
             "schema_version": "1.0.0",
-            "verdict": "needs_reformulation",
+            "verdict": verdict,
             "profile": profile,
             "label": "proof_based",
-            "obligations": evaluate_obligations(payload),
-            "record": None,
-            "reason": "governed_proof requires contest policy to allow non-executable qualification",
+            "obligations": results,
+            "record": record,
+            "projection_record": record,
+            "experiment_revision_required": any(
+                item.get("wrong_reason") or item.get("exploit_persists") for item in results.values()
+            ),
         }
-    results = evaluate_obligations(payload)
-    verdict = decide_verdict(results, profile=profile)
+
+    # --- executable profile: executed artifacts only (S9.3, INV-5.6) --------
+    forged = detect_forgery(payload)
+    if forged:
+        raise EvidenceError(
+            OBLIGATION_FORGERY_REJECTED,
+            "obligation(s) "
+            + ", ".join(forged)
+            + " assert a bare pass with no executed run; booleans are not artifacts",
+            details={"obligations": forged},
+        )
+    stamp = created_at or str(hypothesis.get("created_at") or "")
+    patch_violations = patch_scope_violations(payload)
+    if patch_violations:
+        # Mechanical pre-check BEFORE any execution: out-of-scope patches
+        # force reformulation without a single run.
+        results = {
+            name: {"passed": False, "detail": "blocked pre-execution", "unspecified": True}
+            for name in GATE_B_OBLIGATIONS
+        }
+        results["defect_removal"] = {
+            "passed": False,
+            "detail": "patch scope violation: " + "; ".join(patch_violations)[:2048],
+            "unspecified": False,
+        }
+        evidence_ids = [
+            str(item) for item in (payload.get("evidence_ids") or []) if isinstance(item, str)
+        ]
+        record = build_verdict_record(
+            hypothesis=hypothesis,
+            verdict="needs_reformulation",
+            results=results,
+            created_at=stamp,
+            evidence_ids=evidence_ids,
+            profile=profile,
+        )
+        return {
+            "schema_version": "2.0.0",
+            "verdict": "needs_reformulation",
+            "profile": profile,
+            "label": "executable",
+            "obligations": results,
+            "krait_stamp": None,
+            "pinned": False,
+            "artifact_hashes": [],
+            "record": record,
+            "projection_record": record,
+            "patch_scope_violations": patch_violations,
+            "experiment_revision_required": True,
+        }
+
+    used_runner = runner if runner is not None else ScriptedRunner()
+    runs = execute_runs(payload, used_runner)
+    classification = classify_runs(
+        payload,
+        runs,
+        match_test=str(payload.get("match_test") or DEFAULT_MATCH_TEST),
+        expected_replay_hash=_expected_replay_hash(payload, poc),
+    )
+    # Judgment obligations are recorded verbatim; they never gate pinning in
+    # this milestone — the three executed runs decide (S9.3 c2; skeptic = R3).
+    judgment_payloads: dict[str, dict[str, Any]] = {}
+    for name in JUDGMENT_OBLIGATIONS:
+        judgment_block = payload.get(name)
+        if isinstance(judgment_block, dict):
+            judgment_payloads[name] = judgment_block
+    verdict = classification.verdict
     if verdict not in GATE_B_DECISIONS:
         verdict = "needs_reformulation"
     evidence_ids = [
@@ -213,23 +365,39 @@ def run_gate_b(
         for item in (payload.get("evidence_ids") or (poc or {}).get("evidence_ids") or [])
         if isinstance(item, str)
     ]
-    stamp = created_at or str(hypothesis.get("created_at") or "")
-    record = build_verdict_record(
+    entries = artifact_hashes(payload)
+    record = build_v2_verdict_record(
         hypothesis=hypothesis,
         verdict=verdict,
-        results=results,
+        results=classification.obligations,
+        classification=classification,
         created_at=stamp,
         evidence_ids=evidence_ids,
         profile=profile,
+        artifact_hash_entries=entries,
+        judgment_payloads=judgment_payloads,
     )
     return {
-        "schema_version": "1.0.0",
+        "schema_version": "2.0.0",
         "verdict": verdict,
         "profile": profile,
-        "label": "proof_based" if profile == "governed_proof" else "executable",
-        "obligations": results,
+        "label": "executable",
+        "obligations": classification.obligations,
+        "krait_stamp": classification.krait_stamp,
+        "pinned": classification.pinned,
+        "artifact_hashes": entries,
         "record": record,
+        "projection_record": build_verdict_record(
+            hypothesis=hypothesis,
+            verdict=verdict,
+            results=classification.obligations,
+            created_at=stamp,
+            evidence_ids=evidence_ids,
+            profile=profile,
+        ),
+        "transition_blocked_unpinned": classification.krait_stamp == KRAIT_UNPINNED,
         "experiment_revision_required": any(
-            item.get("wrong_reason") or item.get("exploit_persists") for item in results.values()
+            item.get("wrong_reason") or item.get("exploit_persists")
+            for item in classification.obligations.values()
         ),
     }

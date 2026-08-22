@@ -665,6 +665,18 @@ class BridgeDispatcher:
 
         self._require_write(params)
         obligations = params.get("obligations")
+        # Minimal R2 passthrough: the caller identity comes from the same
+        # channel-credential mapping as hypotheses.remember (§11.4) so forgery
+        # events name the real submitter.
+        try:
+            caller, _session = self._derive_writer(params)
+        except EvidenceError as error:
+            self._journal_denial(
+                "writer_credential_denied",
+                session_id=str(params.get("session") or self.run_id),
+                reason=f"{error.code}: {error.message}",
+            )
+            return error.as_result()
         try:
             return gate_b(
                 self.store,
@@ -672,6 +684,7 @@ class BridgeDispatcher:
                 obligations=obligations if isinstance(obligations, dict) else None,
                 poc_id=str(params["poc_id"]) if params.get("poc_id") else None,
                 profile=str(params.get("profile") or "executable"),
+                caller=caller,
             )
         except EvidenceError as error:
             return error.as_result()

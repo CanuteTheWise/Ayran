@@ -76,8 +76,20 @@ They cannot validate a finding.
 - **Gate A** (pre-PoC): an independent challenger tries to falsify the
   invariant, economics, attacker preconditions, and defenses. Outcomes:
   falsified, needs_missing_fact, needs_reformulation, or poc_worthy.
-- **Gate B** (post-PoC): clean replay, numerical assertions, negative
-  controls, defect mutation, identity/scope/duplicate checks.
+- **Gate B** (post-PoC) is mechanical, not honor-system. Every executable
+  obligation — clean replay, numerical assertions, negative controls, defect
+  removal, fix efficacy — must be an EXECUTED run: `{command, argv, cwd,
+  exit_code, duration_ms}` plus the forge `--json` output; the sidecar parses
+  and re-hashes everything itself over a canonicalized assertion summary.
+  Three runs decide pinning: the vulnerable-revision replay (PoC passes), the
+  patched control (PoC fails via parsed assertions only — a bare non-zero
+  exit or compile error never counts), and the revert-mutation run (pinning
+  assertions fail again). Outcomes carry a Krait stamp: `[POC-PASS]`
+  (defect_pinned) or `[POC-UNPINNED]` (reproduces but pinning incomplete —
+  never advances past observed). A submitted `{"passed": true}` is rejected
+  as obligation forgery and journaled under your identity. Judgment
+  obligations (alternate paths, skeptic, scope/severity) are recorded
+  verbatim but never gate pinning in this milestone.
 
 A finding is not validated until Ayran's evidence rules, both applicable
 gates, scope, source identity, impact, known-issue, duplicate, and severity
@@ -96,7 +108,9 @@ an untested surface as safe; record examined vs untried dimensions.
    Gate A verdicts come only from the independent challenger spawned through
    `spawn_challenger` (root-side, per §7.1): the sidecar validates and seals;
    it never spawns agents, and a caller-supplied verdict is rejected with
-   `VERDICT_OVERRIDE_FORBIDDEN`.
+   `VERDICT_OVERRIDE_FORBIDDEN`. Gate B accepts only executed obligations:
+   submit the recorded runs (command, argv, cwd, exit code, duration, forge
+   JSON) via `evidence.gate_b` — asserted booleans are forgery.
 5. **Report** only after validation. Report generation must not launch tools.
 
 Prefer `ayran.graph_query` / `ayran.artifact_store` (routed through the

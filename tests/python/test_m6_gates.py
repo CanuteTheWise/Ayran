@@ -18,9 +18,10 @@ from m6_fixtures import (
     CHALLENGER_SUBMISSION_FALSIFIED,
     CHALLENGER_SUBMISSION_MISSING_FACT,
     CHALLENGER_SUBMISSION_POC_WORTHY,
-    GATE_B_PASS,
+    GATE_B_EXECUTED,
     TRUE_DEFECT_EVIDENCE,
     challenger_gate_a,
+    executed_replay_hash,
     open_store,
     promote_supported,
     seed_hypothesis,
@@ -147,12 +148,17 @@ def test_gate_b_clean_replay_pins_defect() -> None:
         },
         "claim": "reentrancy",
     }
-    result = run_gate_b(hyp, obligations=GATE_B_PASS)
+    result = run_gate_b(hyp, obligations=GATE_B_EXECUTED)
     assert result["verdict"] == "defect_pinned"
     assert result["record"]["resulting_hypothesis_status"] == "defect_pinned"
     replay = run_gate_b(
         hyp,
-        obligations=GATE_B_PASS,
-        poc={"status": "succeeded", "result_hash": "sha256:" + "a" * 64, "replay_hash": "sha256:" + "a" * 64, "replay_matched": True},
+        obligations=GATE_B_EXECUTED,
+        poc={
+            "status": "succeeded",
+            "result_hash": executed_replay_hash(),
+            "replay_hash": executed_replay_hash(),
+            "replay_matched": True,
+        },
     )
     assert replay["obligations"]["clean_replay"]["passed"] is True

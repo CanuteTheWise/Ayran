@@ -6,6 +6,7 @@ Engines are pure. This module is the only caller of GraphStore.append.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 from ayran.context.ids import content_id
@@ -22,6 +23,7 @@ from ayran.evidence.errors import (
     CREDENTIAL_DENIED,
     FINDING_NOT_FOUND,
     HYPOTHESIS_NOT_FOUND,
+    OBLIGATION_FORGERY_REJECTED,
     ORIGIN_WRITER_DENIED,
     POC_NOT_FOUND,
     REMEMBER_CONTRACT_INVALID,
@@ -58,6 +60,7 @@ from ayran.evidence.state_machine import HypothesisStateMachine, TransitionDecis
 from ayran.evidence.types import DEFAULT_SEVERITY_POLICY_ID
 from ayran.gates.gate_a import run_gate_a
 from ayran.gates.gate_b import run_gate_b
+from ayran.gates.gate_b_mechanical import KRAIT_UNPINNED
 from ayran.graph.canonical import utc_now
 from ayran.graph.recovery import GraphStore
 from ayran.hypotheses.builders import build_hypothesis
@@ -516,6 +519,34 @@ def gate_a(
     return result
 
 
+def _journal_gate_b_forgery(
+    store: GraphStore,
+    hypothesis: dict[str, Any],
+    error: EvidenceError,
+    caller: dict[str, Any] | None,
+) -> None:
+    """Journal obligation_forgery_rejected NAMING the caller identity (S9.3 c1)."""
+
+    from ayran.bridge.lifecycle import record_session_event
+
+    run_id = str(hypothesis.get("run_id") or store.stream.get("run_id") or "")
+    named = caller if isinstance(caller, dict) and caller.get("id") else {
+        "kind": "model",
+        "id": f"prime:{run_id}",
+    }
+    record_session_event(
+        store,
+        run_id=run_id,
+        event_type="obligation_forgery_rejected",
+        payload={
+            "reason": f"{error.code}: {error.message}"[:512],
+            "hypothesis_id": str(hypothesis.get("hypothesis_id") or ""),
+            "caller": {"kind": str(named.get("kind") or ""), "id": str(named.get("id") or "")},
+            "forged_obligations": list((error.details or {}).get("obligations") or []),
+        },
+    )
+
+
 def gate_b(
     store: GraphStore,
     hypothesis_id: str,
@@ -523,7 +554,19 @@ def gate_b(
     obligations: dict[str, Any] | None = None,
     poc_id: str | None = None,
     profile: str = "executable",
+    caller: dict[str, Any] | None = None,
+    runner: Any = None,
 ) -> dict[str, Any]:
+    """Executed-artifact Gate B (§5.6, S9.3).
+
+    The executable profile validates and executes obligations through
+    :mod:`ayran.gates.gate_b_mechanical`. A forged boolean pass raises
+    ``OBLIGATION_FORGERY_REJECTED``: the attempt is journaled with the caller
+    identity derived from the R1 channel-credential mapping, NOTHING is
+    promoted, no verdict record is sealed, and the hypothesis status stays
+    byte-equal. The governed_proof refusal path is preserved byte-for-byte.
+    """
+
     hypothesis = _require_hypothesis(store, hypothesis_id)
     poc = load_poc(store, poc_id) if poc_id else None
     if poc is None:
@@ -533,29 +576,82 @@ def gate_b(
                 poc = props
                 poc["poc_id"] = node["node_id"]
                 break
-    result = run_gate_b(
-        hypothesis,
-        obligations=obligations,
-        poc=poc,
-        created_at=str(hypothesis.get("created_at") or ""),
-        profile=profile,
-    )
+    try:
+        result = run_gate_b(
+            hypothesis,
+            obligations=obligations,
+            poc=poc,
+            created_at=str(hypothesis.get("created_at") or ""),
+            profile=profile,
+            runner=runner,
+        )
+    except EvidenceError as error:
+        if error.code == OBLIGATION_FORGERY_REJECTED:
+            _journal_gate_b_forgery(store, hypothesis, error, caller)
+            return {
+                "schema_version": "2.0.0",
+                "verdict": "needs_reformulation",
+                "profile": profile,
+                "label": "proof_based" if profile == "governed_proof" else "executable",
+                "obligations": {},
+                "record": None,
+                "krait_stamp": None,
+                "pinned": False,
+                "artifact_hashes": [],
+                "reason": f"obligation forgery rejected: {error.message}",
+                "forgery_rejected": True,
+                "error": error.as_dict(),
+            }
+        raise
     record = result.get("record")
     if isinstance(record, dict):
-        persist_contract(store, "da-verdict", record, actor=ACTOR_GATE_B, event_stem="da_verdict")
-        result["verdict_id"] = record["verdict_id"]
+        projection_record = result.get("projection_record")
+        summary = projection_record if isinstance(projection_record, dict) else record
+        persist_contract(store, "da-verdict", summary, actor=ACTOR_GATE_B, event_stem="da_verdict")
+        result["verdict_id"] = str(summary["verdict_id"])
+        if str(record.get("schema_version") or "") == "2.0.0":
+            # The v2 record is journaled verbatim as a sealed graph node: the
+            # canonical da-verdict schema catalog stays untouched (historical
+            # 1.0.0 records remain readable; forward-only, no rewrites).
+            stamp = str(hypothesis.get("created_at") or "")
+            node = evidence_node(
+                node_type="GateBExecutionRecord",
+                node_id=content_id("nod", "gate-b-execution", str(summary["verdict_id"])),
+                run_id=str(hypothesis.get("run_id") or ""),
+                created_at=stamp,
+                source_locator=f"gate-b:{hypothesis_id}",
+                evidence_grade="observed",
+                properties={
+                    "title": "gate-b-execution",
+                    "verdict_id": str(summary["verdict_id"]),
+                    "hypothesis_id": hypothesis_id,
+                    "krait_stamp": str(record.get("krait_stamp") or ""),
+                    "schema_version": "2.0.0",
+                    "record_json": json.dumps(record, sort_keys=True, separators=(",", ":")),
+                },
+            )
+            persist_runtime_node(store, node, actor=ACTOR_GATE_B)
         evidence = {
-            "negative_control_ids": list((obligations or {}).get("negative_control_ids") or [record["verdict_id"]]),
-            "fix_evidence_ids": list((obligations or {}).get("fix_evidence_ids") or [record["verdict_id"]]),
+            "negative_control_ids": list((obligations or {}).get("negative_control_ids") or [result["verdict_id"]]),
+            "fix_evidence_ids": list((obligations or {}).get("fix_evidence_ids") or [result["verdict_id"]]),
             "killed_dimension": "claimed-cause",
             "counterevidence": "Gate B obligation failure",
             "failed_premise": "Gate B rejected the proposed cause or obligations",
-            "evidence_ids": [record["verdict_id"]],
+            "evidence_ids": [result["verdict_id"]],
         }
-        moved = _auto_transition_from_gate(
-            store, hypothesis, str(result["verdict"]), actor=ACTOR_GATE_B, evidence=evidence
-        )
-        result["transition"] = moved
+        if result.get("krait_stamp") == KRAIT_UNPINNED:
+            # [POC-UNPINNED] can NEVER advance past observed: the transition
+            # is blocked explicitly (the PoC reproduced; pinning continues).
+            result["transition"] = None
+            result["transition_blocked_reason"] = (
+                "krait stamp [POC-UNPINNED]: reproduces but pinning incomplete; "
+                "the hypothesis stays observed"
+            )
+        else:
+            moved = _auto_transition_from_gate(
+                store, hypothesis, str(result["verdict"]), actor=ACTOR_GATE_B, evidence=evidence
+            )
+            result["transition"] = moved
     return result
 
 

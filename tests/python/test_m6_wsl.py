@@ -24,9 +24,10 @@ from m5_fixtures import RUN_ID, TARGET_IDENTITY, TARGET_KEY
 from m6_fixtures import (
     CHALLENGER_SUBMISSION_FALSIFIED,
     CHALLENGER_SUBMISSION_POC_WORTHY,
-    GATE_B_PASS,
+    GATE_B_EXECUTED,
     REENTRANT_PROJECT,
     TRUE_DEFECT_EVIDENCE,
+    recorded_poc_for_executed,
     seed_hypothesis,
 )
 
@@ -175,25 +176,23 @@ def test_wsl_true_defect_through_finding(tmp_path: Path) -> None:
             )
         except ClientError:
             poc = {"status": "pending"}
+        recorded_used = False
         if poc.get("status") not in {"succeeded", "failed", "timeout"}:
             poc = client.call(
                 "evidence.poc_run",
                 hypothesis_id=hyp["hypothesis_id"],
-                recorded={
-                    "status": "succeeded",
-                    "stdout": "drained",
-                    "result_hash": "sha256:" + "cd" * 32,
-                    "replay_matched": True,
-                    "one_command": "forge test --match-test test_exploit --json",
-                    "tool_run_id": content_id("trn", hyp["hypothesis_id"], "wsl"),
-                    "evidence_ids": [content_id("evd", hyp["hypothesis_id"], "wsl")],
-                },
+                recorded=recorded_poc_for_executed(str(hyp["hypothesis_id"])),
             )
+            recorded_used = True
+        # Executed fixtures decide Gate B mechanically. The poc_id (and its
+        # replay-hash comparison) is passed only for the recorded PocRun whose
+        # hash was minted over the canonical summary — a live forge run's
+        # raw-stdout hash is a different hashing domain.
         b = client.call(
             "evidence.gate_b",
             hypothesis_id=hyp["hypothesis_id"],
-            obligations=GATE_B_PASS,
-            poc_id=poc.get("poc_id"),
+            obligations=GATE_B_EXECUTED,
+            poc_id=poc.get("poc_id") if recorded_used else None,
         )
         assert b["verdict"] in {"defect_pinned", "needs_reformulation"}
         if b["verdict"] != "defect_pinned":
@@ -204,7 +203,7 @@ def test_wsl_true_defect_through_finding(tmp_path: Path) -> None:
                 evidence={"reproduction_id": str(poc.get("poc_id") or content_id("poc", "wsl"))},
                 actor={"kind": "service", "id": "ayran.poc", "version": "1.0.0"},
             )
-            b = client.call("evidence.gate_b", hypothesis_id=hyp["hypothesis_id"], obligations=GATE_B_PASS)
+            b = client.call("evidence.gate_b", hypothesis_id=hyp["hypothesis_id"], obligations=GATE_B_EXECUTED)
         if b.get("verdict") == "defect_pinned":
             impact = client.call("evidence.impact_assess", hypothesis_id=hyp["hypothesis_id"])
             severity = client.call("evidence.severity_assess", hypothesis_id=hyp["hypothesis_id"])
