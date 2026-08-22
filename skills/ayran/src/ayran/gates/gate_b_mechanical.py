@@ -30,13 +30,19 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from ayran.graph.canonical import canonical_hash
-from ayran.tools.adapters.foundry import copy_project, parse_forge_json
+from ayran.tools.adapters.foundry import (
+    copy_project,
+    parse_forge_coverage_summary,
+    parse_forge_json,
+    run_forge_coverage_summary,
+)
 
 KRAIT_PASS = "[POC-PASS]"
 KRAIT_UNPINNED = "[POC-UNPINNED]"
@@ -248,6 +254,83 @@ class ScriptedRunner:
         )
 
 
+def _forge_payload_from_parsed(parsed: Mapping[str, Any]) -> dict[str, Any]:
+    """Rebuild the canonical forge JSON map parse_forge_json already understands."""
+
+    grouped: dict[str, dict[str, Any]] = {}
+    tests = parsed.get("tests")
+    if isinstance(tests, list):
+        for item in tests:
+            if not isinstance(item, Mapping):
+                continue
+            name = str(item.get("name") or "")
+            if not name:
+                continue
+            contract = str(item.get("contract") or "unknown")
+            grouped.setdefault(contract, {})[name] = {
+                "status": item.get("status"),
+                "gas": item.get("gas"),
+                "reason": item.get("reason"),
+            }
+    return {"test_results": grouped}
+
+
+def _legacy_forge_payload_from_stdout(tool_run: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Defensive fallback only: run_capability never puts stdout on tool_run."""
+
+    stdout_text = str(tool_run.get("stdout") or "")
+    try:
+        decoded = json.loads(stdout_text) if stdout_text.strip() else None
+    except json.JSONDecodeError:
+        decoded = None
+    return decoded if isinstance(decoded, Mapping) else None
+
+
+def _duration_ms(outcome: Mapping[str, Any], tool_run: Mapping[str, Any]) -> int:
+    """Prefer a real elapsed value; never read limits; never fabricate."""
+
+    for blob in (outcome, tool_run):
+        for key in ("duration_ms", "elapsed_ms", "elapsed"):
+            raw = blob.get(key)
+            if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw < 0:
+                continue
+            return int(raw)
+    started = tool_run.get("started_at")
+    ended = tool_run.get("ended_at")
+    if not isinstance(started, str) or not isinstance(ended, str):
+        return 0
+    try:
+        start_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(ended.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    delta_ms = int((end_dt - start_dt).total_seconds() * 1000)
+    return delta_ms if delta_ms >= 0 else 0
+
+
+def _coverage_text(outcome: Mapping[str, Any]) -> str:
+    for key in ("coverage_summary", "stdout", "summary"):
+        raw = outcome.get(key)
+        if isinstance(raw, (bytes, bytearray)):
+            return bytes(raw).decode("utf-8", errors="replace")
+        if isinstance(raw, str) and raw.strip():
+            return raw
+    parsed = outcome.get("parsed")
+    if isinstance(parsed, str) and parsed.strip():
+        return parsed
+    return ""
+
+
+def _coverage_fraction(outcome: Mapping[str, Any], patched_files: Sequence[str]) -> float | None:
+    text = _coverage_text(outcome)
+    if not text.strip():
+        return None
+    try:
+        return parse_forge_coverage_summary(text, patched_files)
+    except (TypeError, ValueError):
+        return None
+
+
 class ForgeRunner:
     """Route the three runs through the FoundryAdapter public surface.
 
@@ -270,6 +353,8 @@ class ForgeRunner:
         pinned_versions: Mapping[str, str] | None = None,
         fork_block: int | None = None,
         seed: int | None = None,
+        adapter_call: Callable[..., Any] | None = None,
+        measure_coverage: bool = True,
     ) -> None:
         self.project_root = Path(project_root)
         self.match_test = str(match_test)
@@ -278,6 +363,8 @@ class ForgeRunner:
         self.pinned_versions = dict(pinned_versions or {})
         self.fork_block = fork_block
         self.seed = seed
+        self.adapter_call = adapter_call
+        self.measure_coverage = measure_coverage
         self.executions: list[str] = []
 
     def _apply_files(self, sandbox: Path, files: tuple[Mapping[str, Any], ...]) -> None:
@@ -305,29 +392,29 @@ class ForgeRunner:
             body += f'\nsolc = "{solc}"\n'
         config.write_text(body + pins + "\n", encoding="utf-8")
 
-    def execute(self, slot: str, block: Mapping[str, Any]) -> MechanicalRunResult:
+    def _call_adapter(self, kind: str, payload: dict[str, Any], *, slot: str) -> dict[str, Any]:
         import asyncio
+        import inspect
 
+        if self.adapter_call is not None:
+            result = self.adapter_call(kind, payload)
+            if inspect.iscoroutine(result):
+                result = asyncio.run(result)
+            if isinstance(result, str):
+                return {"coverage_summary": result, "parsed": None, "tool_run": {}}
+            return result if isinstance(result, dict) else {}
+        if kind == "coverage":
+            return run_forge_coverage_summary(
+                project_root=Path(str(payload.get("project_root") or "")),
+                match_test=str(payload.get("match_test") or self.match_test),
+                patched_files=[str(item) for item in (payload.get("patched_files") or [])],
+            )
         from ayran.tools.doctor import default_environment
         from ayran.tools.registry import CapabilityRegistry
         from ayran.tools.runner import RunContext, policy_from_scope, run_capability
         from ayran.tools.types import ALIAS_FOUNDRY
 
-        self.executions.append(str(slot))
-        sandbox = copy_project(self.project_root)
-        if slot == "patched":
-            self._apply_files(sandbox, self.patch_files)
-        elif slot == "revert_mutation":
-            self._apply_files(sandbox, self.mutation_files)
-        self._pin_versions(sandbox)
         registry = CapabilityRegistry(environment=default_environment())
-        payload: dict[str, Any] = {
-            "project_root": str(sandbox),
-            "match_test": self.match_test,
-            "json_output": True,
-            "fork_block": self.fork_block,
-            "seed": self.seed,
-        }
         identity = {
             "target_id": "tgt_01J00000000000000000000001",
             "source_tree_hash": canonical_hash({"slot": slot}),
@@ -345,14 +432,33 @@ class ForgeRunner:
                 require_available=True,
             )
         )
+        return outcome if isinstance(outcome, dict) else {}
+
+    def execute(self, slot: str, block: Mapping[str, Any]) -> MechanicalRunResult:
+        self.executions.append(str(slot))
+        sandbox = copy_project(self.project_root)
+        if slot == "patched":
+            self._apply_files(sandbox, self.patch_files)
+        elif slot == "revert_mutation":
+            self._apply_files(sandbox, self.mutation_files)
+        self._pin_versions(sandbox)
+        payload: dict[str, Any] = {
+            "project_root": str(sandbox),
+            "match_test": self.match_test,
+            "json_output": True,
+            "fork_block": self.fork_block,
+            "seed": self.seed,
+        }
+        outcome = self._call_adapter("test", payload, slot=slot)
         tool_run = outcome.get("tool_run") if isinstance(outcome, dict) else None
         tool_run = tool_run if isinstance(tool_run, Mapping) else {}
-        stdout_text = str(tool_run.get("stdout") or "")
-        try:
-            decoded = json.loads(stdout_text) if stdout_text.strip() else None
-        except json.JSONDecodeError:
-            decoded = None
-        forge_payload = decoded if isinstance(decoded, Mapping) else None
+        parsed = outcome.get("parsed")
+        compile_error = False
+        if isinstance(parsed, Mapping):
+            forge_payload: Mapping[str, Any] | None = _forge_payload_from_parsed(parsed)
+            compile_error = parsed.get("compile_error") is True
+        else:
+            forge_payload = _legacy_forge_payload_from_stdout(tool_run)
         argv = tuple(str(item) for item in (block.get("argv") or [])) or (
             "forge",
             "test",
@@ -361,16 +467,31 @@ class ForgeRunner:
             "--json",
         )
         raw_exit: Any = tool_run.get("exit_code")
+        failure_type = str(outcome.get("failure_type") or tool_run.get("failure_type") or "")
+        coverage: float | None = None
+        if slot == "patched" and self.measure_coverage:
+            patched_files = [
+                str(spec.get("path") or "") for spec in self.patch_files if spec.get("path")
+            ]
+            cov_payload: dict[str, Any] = {
+                "project_root": str(sandbox),
+                "match_test": self.match_test,
+                "report": "summary",
+                "patched_files": patched_files,
+                "json_output": False,
+            }
+            cov_outcome = self._call_adapter("coverage", cov_payload, slot=slot)
+            coverage = _coverage_fraction(cov_outcome, patched_files)
         return result_from_parsed(
             slot=slot,
             command=" ".join(argv[:1]) or "forge",
             argv=argv,
             cwd=str(sandbox),
             exit_code=int(raw_exit) if isinstance(raw_exit, (int, float, str)) else 1,
-            duration_ms=int(tool_run.get("duration_ms") or 0),
+            duration_ms=_duration_ms(outcome, tool_run),
             forge_payload=forge_payload,
-            coverage=None,
-            compiled_ok=str(tool_run.get("failure_type") or "") != "compile",
+            coverage=coverage,
+            compiled_ok=(not compile_error) and failure_type != "compile",
         )
 
 

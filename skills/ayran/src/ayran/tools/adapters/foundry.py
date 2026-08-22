@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +170,166 @@ def _gas_used(body: dict[str, Any]) -> int | None:
                 if isinstance(maybe, int):
                     return maybe
     return None
+
+
+# forge coverage --report summary: path then first percent. The specified
+# collector is the tight `path |? percent` form; a looser variant accepts
+# extra table columns and box-drawing pipes used by live forge output.
+_COVERAGE_SOL_RE = re.compile(
+    r"([^\s|]+\.(?:sol))\s*\|?\s*([0-9]+(?:\.[0-9]+)?)%",
+    re.IGNORECASE,
+)
+_COVERAGE_SOL_LOOSE_RE = re.compile(
+    r"([^\s|│]+\.(?:sol))\b.*?([0-9]+(?:\.[0-9]+)?)%",
+    re.IGNORECASE,
+)
+_COVERAGE_TOTAL_RE = re.compile(
+    r"\bTotal\b.*?([0-9]+(?:\.[0-9]+)?)%",
+    re.IGNORECASE,
+)
+
+
+def _coverage_path_key(path: str) -> str:
+    return path.replace("\\", "/").strip().lstrip("./")
+
+
+def _coverage_percent_fraction(raw: str) -> float:
+    return float(raw) / 100.0
+
+
+def _coverage_sol_rows(text: str) -> list[tuple[str, float]]:
+    rows: list[tuple[str, float]] = []
+    for line in text.splitlines():
+        match = _COVERAGE_SOL_RE.search(line) or _COVERAGE_SOL_LOOSE_RE.search(line)
+        if match is None:
+            continue
+        rows.append((_coverage_path_key(match.group(1)), _coverage_percent_fraction(match.group(2))))
+    return rows
+
+
+def _coverage_total_fraction(text: str) -> float | None:
+    for line in text.splitlines():
+        if re.search(r"\.(?:sol)\b", line, re.IGNORECASE):
+            continue
+        match = _COVERAGE_TOTAL_RE.search(line)
+        if match is not None:
+            return _coverage_percent_fraction(match.group(1))
+    return None
+
+
+def _coverage_path_matches(row_path: str, patched_files: Sequence[str]) -> bool:
+    row = _coverage_path_key(row_path)
+    for item in patched_files:
+        target = _coverage_path_key(item)
+        if not target:
+            continue
+        if row == target or row.endswith("/" + target) or target.endswith("/" + row):
+            return True
+    return False
+
+
+def parse_forge_coverage_summary(
+    text: str,
+    patched_files: Sequence[str] | None = None,
+) -> float | None:
+    """Parse ``forge coverage --report summary`` into a 0..1 fraction.
+
+    Selection: (1) rows whose relative path equals a patched source file;
+    (2) the sole ``.sol`` row; (3) a Total row; else None.
+    """
+
+    if not isinstance(text, str) or not text.strip():
+        return None
+    try:
+        rows = _coverage_sol_rows(text)
+        wanted = [item for item in (patched_files or ()) if str(item).strip()]
+        if wanted:
+            matched = [percent for path, percent in rows if _coverage_path_matches(path, wanted)]
+            if matched:
+                return min(matched)
+        if len(rows) == 1:
+            return rows[0][1]
+        total = _coverage_total_fraction(text)
+        if total is not None:
+            return total
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def run_forge_coverage_summary(
+    *,
+    project_root: Path,
+    match_test: str,
+    patched_files: Sequence[str] = (),
+    timeout_seconds: int = 900,
+    environment: Environment | None = None,
+) -> dict[str, Any]:
+    """Supervised ``forge coverage --report summary`` in an existing sandbox.
+
+    Argv-only via ``resolve_executable`` + ``invoke_executable``. On any
+    failure returns an empty summary so callers treat coverage as None
+    (INV-5.7 fail-closed).
+    """
+
+    empty: dict[str, Any] = {
+        "tool_run": {"exit_code": None, "limits": {}},
+        "parsed": None,
+        "coverage_summary": "",
+        "failure_type": "prerequisite",
+    }
+    try:
+        root = Path(project_root)
+        if not root.is_dir():
+            return empty
+        if environment is None:
+            from ayran.tools.doctor import default_environment
+
+            environment = default_environment()
+        argv = [
+            "forge",
+            "coverage",
+            "--report",
+            "summary",
+            "--no-match-test",
+            str(match_test),
+        ]
+        resolved = resolve_executable(argv[0], env=environment, path_env=environment.path)
+        argv[0] = str(resolved)
+        overlay = _env_overlay(environment)
+        filtered = filter_env(
+            None,
+            extra_allowlist=("FOUNDRY_PROFILE", "FOUNDRY_ETH_RPC_URL", "ETH_RPC_URL"),
+            overlay=overlay,
+        )
+        raw = invoke_executable(
+            argv,
+            cwd=root,
+            env=filtered,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=50 * 1024 * 1024,
+            graceful_stop_seconds=2,
+            input_paths=[path for path in root.rglob("*") if path.is_file()][:256],
+        )
+        text = raw.stdout.decode("utf-8", errors="replace")
+        if not text.strip():
+            text = raw.stderr.decode("utf-8", errors="replace")
+        coverage = parse_forge_coverage_summary(text, patched_files)
+        return {
+            "tool_run": {
+                "exit_code": raw.exit_code,
+                "started_at": raw.started_at,
+                "ended_at": raw.ended_at,
+                "argv": list(raw.argv),
+                "limits": {},
+            },
+            "parsed": None,
+            "coverage_summary": text,
+            "coverage": coverage,
+            "failure_type": raw.failure_type,
+        }
+    except Exception:
+        return empty
 
 
 class FoundryAdapter(ExecutableAdapter):

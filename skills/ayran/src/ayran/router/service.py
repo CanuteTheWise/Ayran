@@ -174,6 +174,8 @@ def build_maps(
         raise LookupError(map_type)
     cluster = cluster_id or DEFAULT_CLUSTER_ID
     run_id = str(store.stream.get("run_id") or "")
+    raw_identity = store.stream.get("target_identity")
+    target_identity = dict(raw_identity) if isinstance(raw_identity, dict) else None
     kwargs: dict[str, Any] = {
         "cluster_id": cluster,
         "run_id": run_id,
@@ -197,7 +199,13 @@ def build_maps(
                 "value_flows": [item["name"] for item in built.get("entry_points") or [] if item.get("payable") or item.get("value_flow")],
                 "integration_boundaries": [],
             }
-            grid = seed_grid_from_subjects(cluster, subjects, run_id=run_id, created_at="2026-08-12T12:00:00Z")
+            grid = seed_grid_from_subjects(
+                cluster,
+                subjects,
+                run_id=run_id,
+                created_at="2026-08-12T12:00:00Z",
+                target_identity=target_identity,
+            )
             persist_coverage_cells(store, list(grid.cells.values()))
     return {
         "schema_version": "1.0.0",

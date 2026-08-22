@@ -295,6 +295,7 @@ def seed_grid_from_subjects(
     value_at_risk: int = 5,
     privilege_level: int = 1,
     external_interactions: int = 0,
+    target_identity: dict[str, Any] | None = None,
 ) -> CoverageGrid:
     grid = CoverageGrid(cluster_id=cluster_id)
     score = risk_score(
@@ -311,5 +312,6 @@ def seed_grid_from_subjects(
                 created_at=created_at,
                 risk=score,
                 target_refs=[cluster_id],
+                target_identity=target_identity,
             )
     return grid
