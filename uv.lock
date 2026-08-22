@@ -104,7 +104,7 @@ wheels = [
 
 [[package]]
 name = "ayran-contracts"
-version = "0.7.0"
+version = "0.1.6"
 source = { editable = "skills/ayran" }
 dependencies = [
     { name = "jsonschema" },
@@ -123,7 +123,7 @@ requires-dist = [
 
 [[package]]
 name = "ayran-m1-workspace"
-version = "0.7.0"
+version = "0.1.6"
 source = { virtual = "." }
 
 [package.dev-dependencies]

@@ -1,10 +1,15 @@
 """M3 package surface: Prime 0.7.2 pi manifest, skills, template, no Prime edits."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# sha256 of .prime-template/agent/APPEND_SYSTEM.md (UTF-8, \r\n normalized to \n).
+# The post-138f842 charter wording is canonical; any silent edit must break this test.
+_CHARTER_SHA256 = "dde24e7d6d779b337c419d235c001f94d82909542a6017272d14919f7511f30b"
 
 SPECIALISTS = (
     "bug-hunter",
@@ -52,7 +57,10 @@ def test_append_system_lives_only_in_trusted_template() -> None:
     template = ROOT / ".prime-template" / "agent" / "APPEND_SYSTEM.md"
     charter = template.read_text(encoding="utf-8")
     assert charter.startswith("# Ayran audit charter")
-    assert "Never submit or disclose a finding" in charter
+    assert "Never submit a finding" in charter
+    assert "without explicit human approval" in charter
+    normalized = charter.replace("\r\n", "\n").encode("utf-8")
+    assert hashlib.sha256(normalized).hexdigest() == _CHARTER_SHA256
     target_copy = ROOT / "target" / ".prime" / "agent" / "APPEND_SYSTEM.md"
     assert not target_copy.exists()
     settings = json.loads(

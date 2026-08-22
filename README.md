@@ -57,13 +57,14 @@ In the protocol folder, start Prime with `--ayran`. That starts the sidecar and 
 
 ### 2. Mapping: build the model of the target
 
-The mapping engine reads the target's Solidity source and builds five attack-surface maps:
+The mapping engine reads the target's Solidity source and builds six attack-surface maps:
 
 - **Attack surface map** — every external/public function, its state dependencies, value flows, and privilege level. Extracted from Slither and solc output.
 - **Control-flow map** — function-level CFG showing how the contract's computation is structured.
 - **Data-flow map** — which state variables are written by which functions, showing taint paths from user input to state changes.
 - **Authority map** — ownership, roles, access control patterns, unprotected state mutations.
 - **Temporal map** — time-dependent state changes, epoch boundaries, deadline logic, cooldown patterns.
+- **Value-flow map** — asset/value transfer edges across functions and contracts, complementing the data-flow view.
 
 These maps populate the Target Graph. The model never sees them directly — it sees bounded, labeled summaries via the context pack. The maps are deterministic — they come from tool output, not model interpretation.
 
@@ -147,7 +148,7 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 ### Fully active in the runtime workflow
 
-**Krait** — the richest knowledge source. Its attack angles, detector modules, kill-gate logic, candidate-proof-critic separation, impact/falsification methodology, and output schemas are ingested as machine-readable reasoning lenses and methodology records. Krait's workflow patterns are also embedded in the architecture: the M1 journal design, the M5 router's coverage model, and the M6 Gate A/B engine were built around Krait's candidate/proof/critic/kill-gate pattern. All Krait records carry provenance (commit hash, trust tier) and its self-reported scores are NEVER treated as evidence. Its scheduler is never run.
+**Krait** — the richest knowledge source. Its attack angles, detector modules, kill-gate logic, candidate-proof-critic separation, impact/falsification methodology, and output schemas are ingested as machine-readable reasoning lenses and methodology records. Some design choices were informed by Krait's candidate/proof/critic/kill-gate pattern at the conceptual level only; there is no code lineage — the M1 journal, M5 router, and M6 gates are original implementations. All Krait records carry provenance (commit hash, trust tier) and its self-reported scores are NEVER treated as evidence. Its scheduler is never run.
 
 **0xsimao** — all twelve accounting lenses (desynchronization, shares/exchange-rates, cohorts, liquidation/solvency, cross-chain state, rounding, ordering/MEV, DoS, access/trust, integration assumptions, edge states, flow completeness) ingested as first-class reasoning lenses in the Global Graph. The accounting specialist driver uses these directly during hypothesis generation.
 
@@ -163,7 +164,7 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 **ItyFuzz** — registered as an experimental adapter for hybrid EVM/Move sequence exploration (deep stateful fuzzing beyond Foundry's capability). Disabled by default.
 
-**QuillShield Skills** — semantic guards, invariant catalogs, and defensive-review checklists for reentrancy, oracle/flash-liquidity, upgrades, arithmetic, weird-token, DoS. Used in Gate A's security checklist. No wholesale prompt load.
+**QuillShield Skills** — semantic guards, invariant catalogs, and defensive-review checklists for reentrancy, oracle/flash-liquidity, upgrades, arithmetic, weird-token, DoS. Catalogued as a design donor only: nothing from QuillShield is referenced by Gate A or any runtime code today. No wholesale prompt load.
 
 **Plamen** — deterministic outer phases, append-only candidates, disk gates, checkpoints, retries, orphan recovery — these patterns shape the M1 crash-recovery design, M2 process supervision, and M5 checkpointing. Full Plamen runs only as an external baseline, never inlined.
 
@@ -179,7 +180,7 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 **Trail of Bits Skills** — audit context, multi-language entry points, false-positive review, property testing, differential/variant analysis patterns. Shaped the Gate A/B test design and M6 dedup rules.
 
-**DeFiHackLabs** — pinned incident/PoC corpus. Normalized incident cards are ingested into the Global Graph. Used in A0–A7 evaluation fixtures. Retrieved code is never executed.
+**DeFiHackLabs** — pinned incident/PoC corpus, catalogued for future ingestion. No DeFiHackLabs incident cards exist in the Global Graph today and no evaluation fixture derives from it; ingestion is planned work, not current capability. Retrieved code is never executed.
 
 **Shuvon Skills** — unique vulnerability triage and grep-location concepts ingested with dedup/version predicates. Grep is a locator, not semantic proof.
 
@@ -189,7 +190,7 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 ### External baselines
 
-**Hound** — the full Hound agent is run as an isolated comparison against Ayran on the same target with the same budget. Ayran never depends on it; it is used to answer "is Ayran actually better than just using a good base agent?"
+**Hound** — catalogued as a potential external baseline; it is not run today and no isolated comparison has been executed. Whether a real Hound baseline happens is future evaluation work; Ayran never depends on it.
 
 ---
 
@@ -217,7 +218,7 @@ If you already have Prime-Agent 0.7.2 in WSL:
 ayran release install --layer --prime /path/to/prime-agent
 ```
 
-Layer installs Ayran into `~/.local/share/ayran/layer-<version>/` inside WSL, creates a `current` pointer, and writes a machine-readable receipt to `~/.local/share/ayran/receipts/<timestamp>.json`.
+Layer installs Ayran into `<prefix>/versions/<version>/` inside WSL (default prefix `~/.local/ayran`, e.g. `~/.local/ayran/versions/0.1.6`), creates a `current` pointer at `<prefix>/current`, and writes a machine-readable receipt to `<prefix>/receipts/<kind>-<version>.json`.
 
 ### Option B: Install Complete (clean-slate)
 
@@ -367,7 +368,7 @@ The following are evidence-based recommendations to make Ayran more effective fo
 
 ### 1. Validate Fizz and promote A6 from experimental to production
 
-**Why:** Stateful fuzzing (A6 arm) showed measurable value in offline fixture evaluation. Without Fizz being available in production, A6 remains a concept rather than a tool.
+**Why:** No evidence establishes value for stateful fuzzing: the offline sealed-fixture controller computes metrics by formula rather than by measurement, so the A6 arm demonstrates nothing about real-world lift. Without Fizz being available in production, A6 remains a concept rather than a tool.
 
 **What to do:** Install Fizz as a controlled dependency, verify against the pinned Prime 0.7.2 compatibility surface, and run a live A6 evaluation. If the harness shows lift, promote it. If not, drop A6 from Phase 1 release planning and document why.
 

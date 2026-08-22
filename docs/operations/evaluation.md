@@ -23,7 +23,7 @@ Secondary: duplicate rate, coverage, tool-selection accuracy, retrieval usefulne
 
 ## Adjudication
 
-Judges receive source, evidence, proof, negative controls, and assumptions — not the generating arm. Forms are machine-readable and hashed. Disagreements go to a second judge. Inter-rater agreement is reported. Manifests are immutable; errors create a new session.
+Adjudication today is offline and synthetic: two internal judges score the same recorded run metrics with identical formulas, so inter-rater agreement is trivially perfect; no judge reviews source, evidence, proof, or assumptions. Forms and manifests stay machine-readable and immutable; errors create a new session. Live blinded judging is future work.
 
 ## Interpreting results
 

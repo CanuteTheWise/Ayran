@@ -1,6 +1,6 @@
 [project]
 name = "ayran-m1-workspace"
-version = "0.7.0"
+version = "0.1.6"
 description = "Ayran contract generation and canonical Graph Fabric workspace"
 requires-python = ">=3.11,<3.15"
 dependencies = []
