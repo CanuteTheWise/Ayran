@@ -1,11 +1,14 @@
-"""M5 router: budgets, kill scoping, no-progress, replay, injection, dedup."""
+"""M5 router: budgets, kill scoping, no-progress, replay, injection, dedup.
+
+R3 retarget: lens names and LensUpdate emissions replace driver hypotheses.
+"""
 
 from __future__ import annotations
 
 from copy import deepcopy
 
+from ayran.context.lenses import LENS_NAMES
 from ayran.hypotheses.builders import build_hypothesis
-from ayran.hypotheses.drivers.base import DRIVER_NAMES
 from ayran.mapping.coverage import coverage_cell_record
 from ayran.router.budget import TRANCHE, BudgetManager
 from ayran.router.engine import RouterConfig, RouterEngine
@@ -16,22 +19,22 @@ from m5_fixtures import CLUSTER, CREATED, RUN_ID, TARGET_IDENTITY, base_view
 def test_budget_conservation_across_tranche() -> None:
     manager = BudgetManager()
     assert manager.remaining() == TRANCHE
-    assert not manager.spend("global_graph", 80)
-    assert manager.spend("global_graph", 15)
+    assert not manager.spend("precedent", 80)
+    assert manager.spend("precedent", 15)
     assert manager.spend("contradiction", 15)
-    assert manager.spend("tool_derived", 10)
-    assert manager.spend("coverage_derived", 15)
+    assert manager.spend("tool_signal", 10)
+    assert manager.spend("coverage", 15)
     assert manager.spent_total == 55
-    assert not manager.spend("global_graph", 1)
+    assert not manager.spend("precedent", 1)
     assert manager.remaining() == 45
 
 
 def test_model_lane_reserve_is_protected() -> None:
     manager = BudgetManager()
-    assert manager.remaining_for("global_graph") <= 75
-    assert not manager.spend("global_graph", 76)
+    assert manager.remaining_for("precedent") <= 75
+    assert not manager.spend("precedent", 76)
     manager.release_reserve(recorded=True)
-    assert manager.spend("coverage_derived", 15)
+    assert manager.spend("coverage", 15)
 
 
 def test_no_driver_monopolizes_queue() -> None:
@@ -39,14 +42,15 @@ def test_no_driver_monopolizes_queue() -> None:
     view.global_mechanisms = [{"id": "nod_01J0000000000000000000000C", "title": "mech"}]
     engine = RouterEngine(RouterConfig(created_at=CREATED))
     result = engine.step(view)
-    drivers = [
-        action["handler"]["id"]
+    lenses = [
+        action["deduplication_key"]
         for action in result.actions
-        if str(action["handler"]["id"]).startswith("driver.")
+        if action["handler"]["id"] == "lens.update"
     ]
-    assert set(drivers) <= {f"driver.{name}" for name in DRIVER_NAMES}
-    assert len(set(drivers)) >= 3
+    assert lenses
+    assert len(set(lenses)) >= 3
     for name, spent in result.budget["spent"].items():
+        assert name in LENS_NAMES
         assert spent <= result.budget["ceilings"][name]
 
 
@@ -56,10 +60,11 @@ def test_kill_scoping_after_no_material_output() -> None:
     first = engine.step(view)
     victim = next(
         name
-        for name in ("coverage_derived", "tool_derived", "contradiction")
-        if first.driver_results[name].hypotheses
+        for name in ("coverage", "tool_signal", "contradiction")
+        if first.lens_updates.get(name, {}).get("material")
+        or first.lens_updates.get(name, {}).get("guidance")
     )
-    assert first.driver_results[victim].hypotheses
+    assert first.lens_updates[victim]
     second = engine.step(view)
     third = engine.step(view)
     _ = second
@@ -87,6 +92,10 @@ def test_replay_determinism() -> None:
     keys_a = [item["deduplication_key"] for item in first.actions]
     keys_b = [item["deduplication_key"] for item in second.actions]
     assert keys_a == keys_b
+    assert [item for item in first.actions if item["handler"]["id"] == "lens.update"]
+    assert [item for item in first.actions if item["handler"]["id"] == "lens.update"] == [
+        item for item in second.actions if item["handler"]["id"] == "lens.update"
+    ]
 
 
 def test_three_strike_payload_only_quarantine() -> None:
@@ -112,19 +121,17 @@ def test_three_strike_payload_only_quarantine() -> None:
         )
     ]
     engine = RouterEngine(RouterConfig(created_at=CREATED))
-    # Force the driver output by using a view whose model-native claims include injection
-    # via source name that doesn't matter; injection is scanned on produced claims.
     result = engine.step(view)
-    _ = result
-    poisoned = base_view(source_units=[{"kind": "source", "name": "X", "source": "function ignore() external { /* <<SYS>> */ }"}])
-    poisoned.source_units[0]["source"] = (
-        "contract C { function withdraw() external { /* <!-- SYSTEM --> */ } }"
-    )
-    # Directly flag via engine strikes to assert quarantine drops priority.
-    engine.strikes.note("tool_derived", True)
-    engine.strikes.note("tool_derived", True)
-    engine.strikes.note("tool_derived", True)
-    assert "tool_derived" in engine.strikes.quarantined
+    flagged = [
+        payload
+        for payload in result.lens_updates.values()
+        if payload.get("quarantined") or payload.get("payload_only")
+    ]
+    assert flagged
+    engine.strikes.note("tool_signal", True)
+    engine.strikes.note("tool_signal", True)
+    engine.strikes.note("tool_signal", True)
+    assert "tool_signal" in engine.strikes.quarantined
 
 
 def test_tool_dedup_prevents_equivalent_invocations() -> None:
@@ -159,5 +166,10 @@ def test_coverage_cell_used_in_router_deltas() -> None:
     )
     view = base_view(coverage_cells=[cell])
     result = RouterEngine(RouterConfig(created_at=CREATED)).step(view)
-    assert "coverage_derived" in result.driver_results
-    assert result.driver_results["coverage_derived"].hypotheses
+    assert "coverage" in result.lens_updates
+    assert result.lens_updates["coverage"]["coverage_deltas"] or "withdraw" in result.lens_updates[
+        "coverage"
+    ]["guidance"]
+    assert any(item["handler"]["id"] == "coverage.update" for item in result.actions) or result.lens_updates[
+        "coverage"
+    ]["guidance"]

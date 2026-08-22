@@ -1,8 +1,8 @@
-"""Deterministic four-origin router. No model calls. Same view+config → same actions.
+"""Deterministic six-lens router. No model calls. Same view+config → same LensUpdate actions.
 
-R1: the model_native and adversarial_specialist dispatch entries are deleted
-along with their drivers (spec §5.1); hypotheses.remember is now the only
-model_novel authorship path. Full lens conversion is R3.
+R3: RouterEngine.step no longer fabricates hypotheses. It emits LensUpdate
+actions. BudgetManager, StrikeBook, AnchoringState, kill-streaks, quarantine,
+and semantic_checksum survive as advisory state feeding lens text.
 """
 
 from __future__ import annotations
@@ -10,19 +10,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from ayran.context.lenses import (
+    ALWAYS_ON_LENSES,
+    LENS_NAMES,
+    LensBlock,
+    compile_lens_blocks,
+    precedent_suppressed,
+)
 from ayran.context.view import GraphView
 from ayran.hypotheses.dedup import hypothesis_key, tool_key
-from ayran.hypotheses.drivers import PROPOSERS
-from ayran.hypotheses.drivers.base import DRIVER_NAMES, DriverResult
 from ayran.router.actions import ActionRequest, semantic_checksum, to_router_action
 from ayran.router.anchoring import AnchoringState
-from ayran.router.budget import BudgetManager
-from ayran.router.injection import StrikeBook, looks_like_injection
+from ayran.router.budget import CEILINGS, BudgetManager
+from ayran.router.injection import StrikeBook
 from ayran.router.outbox import pending_event_ids
 
 KILL_STREAK = 2
 NO_PROGRESS_CYCLES = 3
-ALWAYS_ON = {"contradiction", "coverage_derived"}
+ALWAYS_ON = ALWAYS_ON_LENSES
 
 
 @dataclass(slots=True)
@@ -38,7 +43,7 @@ class RouterConfig:
 @dataclass(slots=True)
 class StepResult:
     actions: list[dict[str, Any]]
-    driver_results: dict[str, DriverResult]
+    lens_updates: dict[str, dict[str, Any]]
     budget: dict[str, Any]
     checksum: str
     manual_next: bool
@@ -57,6 +62,7 @@ class RouterEngine:
     killed: set[str] = field(default_factory=set)
     seen_hypotheses: set[str] = field(default_factory=set)
     seen_tools: set[str] = field(default_factory=set)
+    seen_lens_fingerprints: dict[str, str] = field(default_factory=dict)
     cycles_without_progress: int = 0
     manual_next: bool = False
     halted: bool = False
@@ -109,81 +115,79 @@ class RouterEngine:
         else:
             self.anchoring.freeze_target_first(view)
 
-        requests: list[ActionRequest] = []
-        driver_results: dict[str, DriverResult] = {}
+        remaining = {name: self.budget.remaining_for(name) for name in LENS_NAMES}
+        blocks = compile_lens_blocks(
+            view,
+            remaining=remaining,
+            extra_patterns=self.config.injection_patterns,
+        )
 
-        order = list(DRIVER_NAMES)
-        # Contradiction and coverage run throughout, not only after others.
-        for name in ALWAYS_ON:
-            if name in order:
-                order.remove(name)
-        order = ["contradiction", "coverage_derived"] + [
-            name for name in DRIVER_NAMES if name not in ALWAYS_ON
+        order = ["contradiction", "coverage"] + [
+            name for name in LENS_NAMES if name not in ALWAYS_ON
         ]
 
+        requests: list[ActionRequest] = []
+        lens_updates: dict[str, dict[str, Any]] = {}
         progress = False
         for name in order:
             if name in self.killed and name not in ALWAYS_ON:
                 continue
-            if name in self.strikes.quarantined:
-                continue
-            if name == "global_graph" and not all_target_first:
-                continue
-            if name == "global_graph" and view.knowledge_policy in {"target_only", "knowledge_blind"}:
+            if name == "precedent" and precedent_suppressed(view):
+                block = blocks[name]
+                lens_updates[name] = block.as_dict()
                 continue
             if self.budget.remaining_for(name) <= 0:
                 continue
-            proposer = PROPOSERS[name]
-            result = proposer(view)
-            flagged = any(
-                looks_like_injection(str(item.get("claim") or ""), self.config.injection_patterns)
-                for item in result.hypotheses
-            )
-            if flagged:
-                result.payload_only = True
+            block = blocks[name]
+            if name in self.strikes.quarantined or block.quarantined:
                 quarantined = self.strikes.note(name, True)
                 if quarantined:
                     self.killed.add(name)
-            fresh: list[dict[str, Any]] = []
-            for item in result.hypotheses:
-                key = hypothesis_key(item)
-                if key in self.seen_hypotheses:
-                    continue
-                self.seen_hypotheses.add(key)
-                fresh.append(item)
-            result.hypotheses = fresh
-            result.material = bool(fresh) or bool(result.coverage_deltas)
-            if not result.material:
+                block.payload_only = True
+                block.quarantined = True
+                block.material = False
+                block.guidance = "[QUARANTINED: injection]"
+            fingerprint = str(block.as_dict()["fingerprint"])
+            prior = self.seen_lens_fingerprints.get(name)
+            fresh = fingerprint != prior
+            if fresh:
+                self.seen_lens_fingerprints[name] = fingerprint
+            material = bool(block.material and fresh) or bool(block.coverage_deltas and fresh)
+            if block.payload_only:
+                material = False
+            if not material:
                 self.kill_streaks[name] = self.kill_streaks.get(name, 0) + 1
                 if self.kill_streaks[name] >= self.config.kill_streak:
                     self.killed.add(name)
             else:
                 self.kill_streaks[name] = 0
                 progress = True
-            spend = min(result.units_spent or 1, self.budget.remaining_for(name), FLOOR_CAP(name))
-            if spend and not result.payload_only:
+            spend = min(1 if material else 0, self.budget.remaining_for(name), CEILINGS[name])
+            if spend and not block.payload_only:
                 self.budget.spend(name, spend)
-                result.units_spent = spend
-            driver_results[name] = result
-            requests.append(
-                ActionRequest(
-                    kind="DispatchDriver",
-                    cluster_id=view.cluster_id,
-                    dedup_suffix=name,
-                    budget_units=result.units_spent,
-                    driver_name=name,
-                    payload_only=result.payload_only,
-                    reason=result.stop_reason or name,
-                    run_id=view.run_id,
-                    created_at=self.config.created_at,
-                    target_identity=view.target_identity or None,
-                    value_at_risk=view.value_at_risk,
-                    urgency=3 if name in ALWAYS_ON else 2,
-                    novelty=1,
-                    extra=str(len(result.hypotheses)),
-                )
-            )
-            for delta in result.coverage_deltas:
+                block.units_spent = spend
+                block.budget_remaining = self.budget.remaining_for(name)
+            lens_updates[name] = block.as_dict()
+            requests.append(self._lens_request(view, name, block))
+            if name == "specialist":
+                for role in block.advised_roles:
+                    requests.append(
+                        ActionRequest(
+                            kind="RequestSpecialist",
+                            cluster_id=view.cluster_id,
+                            dedup_suffix=role,
+                            role_id=role,
+                            budget_units=min(1, self.budget.remaining_for("specialist")),
+                            run_id=view.run_id,
+                            created_at=self.config.created_at,
+                            target_identity=view.target_identity or None,
+                            value_at_risk=view.value_at_risk,
+                            reason=f"advise rlm spawn {role}",
+                            urgency=2,
+                            novelty=1,
+                        )
+                    )
+            for delta in block.coverage_deltas:
                 requests.append(
                     ActionRequest(
                         kind="RecordCoverageUpdate",
@@ -213,7 +217,7 @@ class RouterEngine:
                         cluster_id=view.cluster_id,
                         dedup_suffix=key.replace(":", ".")[:80],
                         capability_id=capability,
-                        budget_units=min(5, self.budget.remaining_for("tool_derived")),
+                        budget_units=min(5, self.budget.remaining_for("tool_signal")),
                         run_id=view.run_id,
                         created_at=self.config.created_at,
                         target_identity=view.target_identity or None,
@@ -306,7 +310,25 @@ class RouterEngine:
         if view.knowledge_policy == "graph_aware":
             metrics = self.anchoring.record_post_retrieval(view)
         self.history.extend(actions)
-        return self._result(actions, driver_results, "ok", metrics)
+        return self._result(actions, lens_updates, "ok", metrics)
+
+    def _lens_request(self, view: GraphView, name: str, block: LensBlock) -> ActionRequest:
+        return ActionRequest(
+            kind="LensUpdate",
+            cluster_id=view.cluster_id,
+            dedup_suffix=name,
+            budget_units=block.units_spent,
+            driver_name=name,
+            payload_only=block.payload_only,
+            reason=block.stop_reason or name,
+            run_id=view.run_id,
+            created_at=self.config.created_at,
+            target_identity=view.target_identity or None,
+            value_at_risk=view.value_at_risk,
+            urgency=3 if name in ALWAYS_ON else 2,
+            novelty=1,
+            extra=str(block.budget_remaining),
+        )
 
     def _action(self, view: GraphView, request: ActionRequest) -> dict[str, Any]:
         filled = replace(
@@ -318,13 +340,13 @@ class RouterEngine:
     def _result(
         self,
         actions: list[dict[str, Any]],
-        driver_results: dict[str, DriverResult],
+        lens_updates: dict[str, dict[str, Any]],
         reason: str,
         metrics: dict[str, Any] | None = None,
     ) -> StepResult:
         return StepResult(
             actions=actions,
-            driver_results=driver_results,
+            lens_updates=lens_updates,
             budget=self.budget.as_dict(),
             checksum=semantic_checksum(actions),
             manual_next=self.manual_next,
@@ -332,9 +354,3 @@ class RouterEngine:
             anchoring_metrics=metrics or {},
             reason=reason,
         )
-
-
-def FLOOR_CAP(name: str) -> int:
-    from ayran.router.budget import CEILINGS
-
-    return CEILINGS[name]

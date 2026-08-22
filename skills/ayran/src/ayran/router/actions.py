@@ -11,6 +11,7 @@ from ayran.graph.canonical import object_hash
 
 ActionKind = Literal[
     "DispatchDriver",
+    "LensUpdate",
     "InvokeTool",
     "InjectContext",
     "RequestSpecialist",
@@ -25,6 +26,7 @@ ActionKind = Literal[
 
 HANDLER_KIND = {
     "DispatchDriver": "service",
+    "LensUpdate": "service",
     "InvokeTool": "adapter",
     "InjectContext": "service",
     "RequestSpecialist": "specialist",
@@ -39,6 +41,7 @@ HANDLER_KIND = {
 
 HANDLER_ID = {
     "DispatchDriver": "driver.dispatch",
+    "LensUpdate": "lens.update",
     "InvokeTool": "tool.invoke",
     "InjectContext": "context.inject",
     "RequestSpecialist": "specialist.request",

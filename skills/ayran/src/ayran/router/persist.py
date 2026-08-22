@@ -7,10 +7,10 @@ from typing import Any
 from ayran.api.validators import validate_contract
 from ayran.context.contracts import ACTOR_ROUTER, graph_node, typed_property
 from ayran.context.ids import content_id
+from ayran.context.lenses import LENS_NAMES
 from ayran.graph.canonical import utc_now
 from ayran.graph.recovery import GraphStore
 from ayran.graph.types import AppendCommand, AppendItem
-from ayran.hypotheses.drivers.base import DRIVER_NAMES, DriverResult
 from ayran.router.engine import StepResult
 
 ZERO_HASH = "sha256:" + "0" * 64
@@ -117,11 +117,14 @@ def persist_graph_objects(
     return store.append(command)
 
 
-def persist_driver_results(store: GraphStore, results: dict[str, DriverResult]) -> None:
-    hypotheses: list[dict[str, Any]] = []
-    for result in results.values():
-        hypotheses.extend(result.hypotheses)
-    persist_hypotheses(store, hypotheses)
+def persist_lens_state(store: GraphStore, results: dict[str, dict[str, Any]]) -> None:
+    """Lens updates are advisory; they do not create Hypothesis nodes (INV-5.1).
+
+    Round-trip persistence of spend/kill lives in persist_router_runtime via
+    DriverState nodes keyed driver=<lens name>.
+    """
+
+    _ = (store, results)
 
 
 def persist_runtime_node(store: GraphStore, node: dict[str, Any]) -> dict[str, Any]:
@@ -174,7 +177,7 @@ def persist_router_runtime(
         )
     )
     spent = result.budget.get("spent") or {}
-    for name in DRIVER_NAMES:
+    for name in LENS_NAMES:
         nodes.append(
             graph_node(
                 node_id=content_id("nod", "driver-state", name, cluster_id),

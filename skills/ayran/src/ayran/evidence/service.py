@@ -23,6 +23,7 @@ from ayran.evidence.errors import (
     CREDENTIAL_DENIED,
     FINDING_NOT_FOUND,
     HYPOTHESIS_NOT_FOUND,
+    INJECTION_QUARANTINED,
     OBLIGATION_FORGERY_REJECTED,
     ORIGIN_WRITER_DENIED,
     POC_NOT_FOUND,
@@ -67,6 +68,7 @@ from ayran.hypotheses.builders import build_hypothesis
 from ayran.hypotheses.dedup import hypothesis_key
 from ayran.reporting.linter import lint as lint_report
 from ayran.reporting.renderer import render as render_report
+from ayran.router.injection import looks_like_injection
 
 MACHINE = HypothesisStateMachine()
 
@@ -91,6 +93,114 @@ ORIGIN_WRITER_ALLOWLIST: dict[str, frozenset[str] | None] = {
 WRITER_KINDS = frozenset(
     {"human", "model", "service", "tool", "specialist", "gate", "router", "importer"}
 )
+WRITER_STRIKE_QUARANTINE = 3
+INJECTION_EVENT = "injection_quarantined"
+
+
+def _writer_key(writer: dict[str, Any]) -> str:
+    return f"{writer.get('kind')}:{writer.get('id')}"
+
+
+def _load_writer_strikes(store: GraphStore) -> tuple[dict[str, int], set[str]]:
+    """Journal-and-graph derived per-writer strike counts (Scope C).
+
+    Counts live on PayloadStrike nodes keyed by writer identity; quarantine
+    lives on Quarantine nodes. Both round-trip through the existing snapshot
+    fields payload_strikes / quarantined_sources.
+    """
+
+    counts: dict[str, int] = {}
+    quarantined: set[str] = set()
+    try:
+        for node in load_nodes_by_type(store, "PayloadStrike"):
+            props = node_props(node)
+            source = str(props.get("source_id") or "")
+            if source:
+                counts[source] = int(props.get("count") or 0)
+        for node in load_nodes_by_type(store, "Quarantine"):
+            props = node_props(node)
+            source = str(props.get("source_id") or "")
+            if source:
+                quarantined.add(source)
+    except Exception:
+        return counts, quarantined
+    return counts, quarantined
+
+
+def _persist_writer_strike(
+    store: GraphStore,
+    *,
+    writer: dict[str, Any],
+    count: int,
+    quarantined: bool,
+    run_id: str,
+    stamp: str,
+) -> None:
+    key = _writer_key(writer)
+    strike_id = content_id("nod", "writer-strike", key)
+    persist_runtime_node(
+        store,
+        evidence_node(
+            node_type="PayloadStrike",
+            node_id=strike_id,
+            run_id=run_id,
+            created_at=stamp,
+            source_locator=f"injection:{key}",
+            properties={"title": "writer-strike", "source_id": key, "count": int(count)},
+        ),
+        actor={"kind": "service", "id": "ayran.evidence", "version": "1.0.0"},
+    )
+    if quarantined:
+        quarantine_id = content_id("nod", "writer-quarantine", key)
+        persist_runtime_node(
+            store,
+            evidence_node(
+                node_type="Quarantine",
+                node_id=quarantine_id,
+                run_id=run_id,
+                created_at=stamp,
+                source_locator=f"injection-quarantine:{key}",
+                properties={"title": "writer-quarantine", "source_id": key, "count": int(count)},
+            ),
+            actor={"kind": "service", "id": "ayran.evidence", "version": "1.0.0"},
+        )
+
+
+def _journal_injection(
+    store: GraphStore,
+    *,
+    writer: dict[str, Any],
+    slot: str,
+    run_id: str,
+    strike: int = 0,
+    note: str = "",
+) -> None:
+    from ayran.bridge.lifecycle import record_session_event
+
+    payload: dict[str, Any] = {
+        "writer": {"kind": str(writer.get("kind") or ""), "id": str(writer.get("id") or "")},
+        "slot": slot,
+        "reason": "injection",
+        "strike": int(strike),
+    }
+    if note:
+        payload["note"] = note[:128]
+    record_session_event(
+        store,
+        run_id=run_id,
+        event_type=INJECTION_EVENT,
+        payload=payload,
+    )
+
+
+def _scan_text_slots(
+    slots: list[tuple[str, str]],
+    extra_patterns: tuple[str, ...] = (),
+) -> str | None:
+    for slot, text in slots:
+        if looks_like_injection(text, extra_patterns):
+            return slot
+    return None
 
 
 def _view_dict(store: GraphStore, cluster_id: str | None = None) -> dict[str, Any]:
@@ -287,6 +397,7 @@ def remember(
     session: str = "",
     pack_hash: str | None = None,
     created_at: str | None = None,
+    injection_patterns: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Create one model-authored Hypothesis node at status ``lead`` (spec §5.1).
 
@@ -336,6 +447,57 @@ def remember(
 
     run_id = str(store.stream.get("run_id") or "")
     stamp = created_at or utc_now()
+    writer_actor = {"kind": writer_kind, "id": writer_id, "version": "1.0.0"}
+    writer_key = _writer_key(writer_actor)
+    extra = injection_patterns
+    stream_extra = store.stream.get("injection_patterns")
+    if isinstance(stream_extra, (list, tuple)):
+        extra = extra + tuple(str(item) for item in stream_extra)
+    counts, quarantined = _load_writer_strikes(store)
+    if writer_key in quarantined:
+        _journal_injection(
+            store,
+            writer=writer_actor,
+            slot="writer",
+            run_id=run_id,
+            strike=max(WRITER_STRIKE_QUARANTINE, int(counts.get(writer_key, 0))),
+            note="writer_quarantined",
+        )
+        raise EvidenceError(
+            INJECTION_QUARANTINED,
+            "writer is quarantined for this session after three injection strikes",
+            details={"writer": {"kind": writer_kind, "id": writer_id}, "slot": "writer"},
+        )
+    slots: list[tuple[str, str]] = [("claim", claim_text)]
+    for index, step in enumerate(path):
+        slots.append((f"attack_path[{index}]", step))
+    for index, item in enumerate(cleaned_preconditions):
+        slots.append((f"precondition[{index}]", str(item.get("description") or "")))
+    matched_slot = _scan_text_slots(slots, extra)
+    if matched_slot is not None:
+        new_count = int(counts.get(writer_key, 0)) + 1
+        banned = new_count >= WRITER_STRIKE_QUARANTINE
+        _persist_writer_strike(
+            store,
+            writer=writer_actor,
+            count=new_count,
+            quarantined=banned,
+            run_id=run_id,
+            stamp=stamp,
+        )
+        _journal_injection(
+            store,
+            writer=writer_actor,
+            slot=matched_slot,
+            run_id=run_id,
+            strike=new_count,
+        )
+        raise EvidenceError(
+            INJECTION_QUARANTINED,
+            "remember() refused: injection scan flagged an input slot",
+            details={"writer": {"kind": writer_kind, "id": writer_id}, "slot": matched_slot},
+        )
+
     candidate = build_hypothesis(
         origin=origin,
         claim=claim_text,
@@ -447,6 +609,48 @@ def gate_a(
             "the caller-supplied verdict channel is deleted (§5.5); verdicts enter "
             "only via the credentialed challenger submission",
             details={"hypothesis_id": hypothesis_id},
+        )
+    scan_slots: list[tuple[str, str]] = [("claim", str(hypothesis.get("claim") or ""))]
+    for index, step in enumerate(hypothesis.get("attack_path") or []):
+        scan_slots.append((f"attack_path[{index}]", str(step)))
+    for index, item in enumerate(hypothesis.get("preconditions") or []):
+        if isinstance(item, dict):
+            scan_slots.append((f"precondition[{index}]", str(item.get("description") or "")))
+        else:
+            scan_slots.append((f"precondition[{index}]", str(item)))
+    if isinstance(submission, dict):
+        for key, value in sorted(submission.items()):
+            if isinstance(value, str):
+                scan_slots.append((f"submission.{key}", value))
+            elif isinstance(value, (dict, list)):
+                scan_slots.append((f"submission.{key}", json.dumps(value, sort_keys=True)))
+    try:
+        view = snapshot_view(OntologyQueries(store=store), run_id=str(store.stream.get("run_id") or ""))
+        for unit in view.source_units:
+            text = str(unit.get("source") or unit.get("text") or "")
+            if text:
+                scan_slots.append(("target_slice", text))
+    except Exception:
+        pass
+    matched_slot = _scan_text_slots(scan_slots)
+    if matched_slot is not None:
+        history = hypothesis.get("transition_history") or []
+        actor = history[0].get("actor") if history and isinstance(history[0], dict) else {}
+        writer = {
+            "kind": str((actor or {}).get("kind") or "model"),
+            "id": str((actor or {}).get("id") or "unknown"),
+        }
+        _journal_injection(
+            store,
+            writer=writer,
+            slot=matched_slot,
+            run_id=str(hypothesis.get("run_id") or store.stream.get("run_id") or ""),
+            note=str(hypothesis_id),
+        )
+        raise EvidenceError(
+            INJECTION_QUARANTINED,
+            "Gate A refused: injection scan flagged an input slot",
+            details={"hypothesis_id": hypothesis_id, "slot": matched_slot, "writer": writer},
         )
     stamped: dict[str, Any] | None = None
     presented: str | None = None

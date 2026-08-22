@@ -63,7 +63,7 @@ def test_cli_context_compile_and_router_status(tmp_path: Path) -> None:
         ]
     )
     assert code == 0
-    assert "coverage_derived" in status
+    assert "coverage" in status
     assert "budget" in status
     code, maps = _invoke(
         [
@@ -105,12 +105,12 @@ def test_router_step_persists_target_first_and_budget(tmp_path: Path) -> None:
         )
         persist_graph_objects(store, built["nodes"], built["edges"])
         first = router_step(store, cluster_id=CLUSTER, persist=True)
-        assert first["origins"].get("coverage_derived") == "coverage"
+        assert first["lens_updates"]["coverage"]["lens"] == "coverage"
         status = router_status(store, cluster_id=CLUSTER)
-        assert status["budget"]["spent"]["coverage_derived"] > 0
-        assert CLUSTER in status.get("driver_states", {}) or status["budget"]["spent"]["coverage_derived"]
+        assert status["budget"]["spent"]["coverage"] > 0
+        assert CLUSTER in status.get("lens_states", {}) or status["budget"]["spent"]["coverage"]
         second = router_step(store, cluster_id=CLUSTER, persist=True)
-        # After the target-first pass is recorded, later cycles may include global_graph.
+        # After the target-first pass is recorded, later cycles may include precedent.
         _ = second
     finally:
         store.close()

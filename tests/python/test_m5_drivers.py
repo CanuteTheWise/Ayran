@@ -1,20 +1,23 @@
-"""M5 drivers: distinguishable origins. R1: the templated model_native and
-adversarial_specialist drivers are deleted (§5.1); model_novel authorship now
-flows only through hypotheses.remember (see test_r1_hypothesis_remember.py)."""
+"""M5 lenses: distinguishable origins. R3 retarget of driver distinguishability.
+
+R1: the templated model_native and adversarial_specialist drivers are deleted
+(§5.1); model_novel authorship now flows only through hypotheses.remember
+(see test_r1_hypothesis_remember.py).
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from ayran.context.lenses import LENS_NAMES, LENS_ORIGINS, compile_lens_blocks
 from ayran.evidence.service import remember
-from ayran.hypotheses.drivers import propose_all
-from ayran.hypotheses.drivers.base import DRIVER_NAMES, DRIVER_ORIGINS
-from m5_fixtures import base_view
+from m5_fixtures import CLUSTER, base_view
 
 
 def test_drivers_are_distinguishable() -> None:
     view = base_view(
         knowledge_policy="graph_aware",
+        target_first_completed=[CLUSTER],
         global_mechanisms=[{"id": "nod_01J0000000000000000000000A", "title": "reentrancy-pattern"}],
         global_incidents=[{"id": "nod_01J0000000000000000000000B", "title": "incident-x"}],
         contradictions=[{"id": "c1", "left": "spec:shares", "right": "code:shares", "kind": "spec-code"}],
@@ -29,15 +32,15 @@ def test_drivers_are_distinguishable() -> None:
         maps={"attack_surface": {"entry_points": ["withdraw", "deposit"]}},
         coverage_cells=[],
     )
-    results = propose_all(view)
-    assert set(results) == set(DRIVER_NAMES)
-    origins = {name: results[name].origin for name in DRIVER_NAMES}
-    assert origins == DRIVER_ORIGINS
-    claims = {name: tuple(results[name].distinguishable_claims()) for name in DRIVER_NAMES}
-    # Each origin must produce at least one claim, and the claim sets must not collapse to one.
-    assert all(claims[name] for name in DRIVER_NAMES)
-    unique_blobs = {" | ".join(claims[name]) for name in DRIVER_NAMES}
-    assert len(unique_blobs) == len(DRIVER_NAMES)
+    blocks = compile_lens_blocks(view)
+    assert set(blocks) == set(LENS_NAMES)
+    origins = {name: LENS_ORIGINS[name] for name in LENS_NAMES}
+    assert origins["first_principles"] == "model_novel"
+    assert origins["precedent"] == "global_graph"
+    assert origins["tool_signal"] == "tool"
+    guidances = {name: blocks[name].guidance for name in LENS_NAMES if not blocks[name].suppressed}
+    assert all(guidances[name] for name in guidances)
+    assert len(set(guidances.values())) == len(guidances)
 
 
 def test_model_novel_authorship_needs_no_anchors(tmp_path: Path) -> None:
@@ -73,8 +76,7 @@ def test_model_novel_authorship_needs_no_anchors(tmp_path: Path) -> None:
 
 
 def test_global_graph_stops_when_blind() -> None:
-    from ayran.hypotheses.drivers.global_graph import propose
-
-    result = propose(base_view(knowledge_policy="knowledge_blind"))
-    assert result.stop is True
-    assert result.origin == "global_graph"
+    blocks = compile_lens_blocks(base_view(knowledge_policy="knowledge_blind"))
+    assert blocks["precedent"].suppressed is True
+    assert blocks["precedent"].stop_reason == "suppressed"
+    assert LENS_ORIGINS["precedent"] == "global_graph"

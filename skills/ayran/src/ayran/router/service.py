@@ -6,6 +6,7 @@ from typing import Any
 
 from ayran.context.compiler import compile_with_injection
 from ayran.context.ids import DEFAULT_CLUSTER_ID, ZERO_HASH
+from ayran.context.lenses import LENS_NAMES
 from ayran.context.queries import OntologyQueries, snapshot_view
 from ayran.context.serialize import serialize_injection
 from ayran.mapping import MAP_BUILDERS
@@ -13,8 +14,8 @@ from ayran.mapping.coverage import grid_from_cells, parse_cell_meta
 from ayran.router.engine import RouterConfig, RouterEngine
 from ayran.router.persist import (
     persist_coverage_cells,
-    persist_driver_results,
     persist_graph_objects,
+    persist_lens_state,
     persist_router_actions,
     persist_router_runtime,
 )
@@ -68,13 +69,13 @@ def router_status(store: Any, *, cluster_id: str | None = None) -> dict[str, Any
         "manual_next": engine.manual_next,
         "halted": engine.halted,
         "budget": engine.budget.as_dict(),
-        "driver_states": {
+        "lens_states": {
             name: {
                 "killed": name in engine.killed,
                 "no_progress": engine.kill_streaks.get(name, 0),
                 "spend": engine.budget.spent.get(name, 0),
             }
-            for name in engine.budget.as_dict()["spent"]
+            for name in LENS_NAMES
         },
         "pending_actions": len(view.router_actions),
         "coverage": grid.get_coverage_summary(),
@@ -92,8 +93,7 @@ def router_step(store: Any, *, cluster_id: str | None = None, persist: bool = Tr
     result = engine.step(view)
     if persist:
         persist_router_actions(store, result.actions)
-        persist_driver_results(store, result.driver_results)
-        model_native = result.driver_results.get("model_native")
+        persist_lens_state(store, result.lens_updates)
         persist_router_runtime(
             store,
             cluster_id=view.cluster_id,
@@ -104,8 +104,7 @@ def router_step(store: Any, *, cluster_id: str | None = None, persist: bool = Tr
             kill_streaks=engine.kill_streaks,
             no_progress_cycles=engine.cycles_without_progress,
             freeze_hash=engine.anchoring.freeze_hashes.get(view.cluster_id) or ZERO_HASH,
-            target_first_completed=bool(view.cluster_id in view.target_first_completed)
-            or bool(model_native and model_native.hypotheses),
+            target_first_completed=bool(view.cluster_id in view.target_first_completed),
         )
     return {
         "schema_version": "1.0.0",
@@ -116,13 +115,7 @@ def router_step(store: Any, *, cluster_id: str | None = None, persist: bool = Tr
         "budget": result.budget,
         "anchoring_metrics": result.anchoring_metrics,
         "actions": result.actions,
-        "hypotheses": {
-            name: [item.get("hypothesis_id") for item in driver.hypotheses]
-            for name, driver in result.driver_results.items()
-        },
-        "origins": {
-            name: driver.origin for name, driver in result.driver_results.items()
-        },
+        "lens_updates": result.lens_updates,
     }
 
 
