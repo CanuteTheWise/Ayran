@@ -102,13 +102,13 @@ def test_wsl_router_session_and_blind_aware(tmp_path: Path) -> None:
             source_text=VAULT_SOURCE,
         )
         status = client.call("router.status", cluster_id=CLUSTER)
-        assert "model_native" in status["budget"]["spent"]
+        assert "coverage_derived" in status["budget"]["spent"]
         for name, spent in status["budget"]["spent"].items():
             assert spent <= status["budget"]["ceilings"][name]
         step = client.call("router.step", cluster_id=CLUSTER, persist=True)
         assert step["checksum"].startswith("sha256:")
         origins = step["origins"]
-        assert origins.get("model_native") == "model_novel"
+        assert origins.get("coverage_derived") == "coverage"
         replay = client.call("router.step", cluster_id=CLUSTER, persist=False)
         _ = replay
         history = client.call("router.history", limit=10)
@@ -175,7 +175,7 @@ def test_wsl_cli_router_status_and_maps(tmp_path: Path) -> None:
             ]
         )
     assert code == 0
-    assert "model_native" in buffer.getvalue()
+    assert "coverage_derived" in buffer.getvalue()
     buffer = io.StringIO()
     with redirect_stdout(buffer):
         code = cli_main(

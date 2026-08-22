@@ -9,7 +9,6 @@ from ayran.evaluation.metrics import discover, false_positives
 from ayran.evaluation.sealed import built_in_catalog
 from ayran.evidence.service import (
     finding_build,
-    gate_a,
     gate_b,
     impact_assess,
     poc_run,
@@ -19,11 +18,13 @@ from ayran.evidence.service import (
     transition,
 )
 from ayran.graph.recovery import GraphStore
-from m5_fixtures import VAULT_SOURCE
 from m6_fixtures import (
+    CHALLENGER_SUBMISSION_FALSIFIED,
+    CHALLENGER_SUBMISSION_POC_WORTHY,
     GATE_B_PASS,
     REENTRANT_SOURCE,
     TRUE_DEFECT_EVIDENCE,
+    challenger_gate_a,
     open_store,
     promote_supported,
     seed_hypothesis,
@@ -40,7 +41,7 @@ def _validated_finding(store: GraphStore) -> dict[str, str]:
     )
     hid = str(hyp["hypothesis_id"])
     promote_supported(store, hid, TRUE_DEFECT_EVIDENCE)
-    a = gate_a(store, hid, analysis={"source": REENTRANT_SOURCE})
+    a = challenger_gate_a(store, hid, dict(CHALLENGER_SUBMISSION_POC_WORTHY))
     poc = poc_run(
         store,
         hid,
@@ -116,12 +117,9 @@ def test_false_positive_killed_at_gate_a(tmp_path: Path) -> None:
             root_cause="arbitrary-send-eth",
         )
         promote_supported(store, hyp["hypothesis_id"])
-        from ayran.evidence.load import load_hypothesis
-        from ayran.gates.gate_a import run_gate_a
-
-        supported = load_hypothesis(store, hyp["hypothesis_id"])
-        assert supported is not None
-        result = run_gate_a(supported, analysis={"source": VAULT_SOURCE}, created_at=supported["created_at"])
+        result = challenger_gate_a(
+            store, hyp["hypothesis_id"], dict(CHALLENGER_SUBMISSION_FALSIFIED)
+        )
         assert result["verdict"] == "falsified"
     finally:
         store.close()

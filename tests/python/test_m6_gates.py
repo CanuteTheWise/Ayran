@@ -1,4 +1,10 @@
-"""M6 Gate A/B structured verdicts. No model calls."""
+"""M6 Gate A/B structured verdicts. No model calls.
+
+R1: the deterministic decider and the caller-forced verdict channel are deleted
+(§5.5). Gate A verdicts arrive only as structurally validated challenger
+submissions under a stamped reviewer identity; the three Gate A tests below
+assert that new contract.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +14,19 @@ import pytest
 from ayran.evidence.errors import EVIDENCE_CEILING, GATE_PRECONDITION, EvidenceError
 from ayran.gates.gate_a import run_gate_a
 from ayran.gates.gate_b import run_gate_b
-from m5_fixtures import VAULT_SOURCE
 from m6_fixtures import (
+    CHALLENGER_SUBMISSION_FALSIFIED,
+    CHALLENGER_SUBMISSION_MISSING_FACT,
+    CHALLENGER_SUBMISSION_POC_WORTHY,
     GATE_B_PASS,
-    REENTRANT_SOURCE,
     TRUE_DEFECT_EVIDENCE,
+    challenger_gate_a,
     open_store,
     promote_supported,
     seed_hypothesis,
 )
+
+STAMPED_REVIEWER = {"kind": "gate", "id": "rlm:chd-01j", "version": "1.0.0"}
 
 
 def test_gate_a_false_positive_falsified(tmp_path: Path) -> None:
@@ -33,13 +43,20 @@ def test_gate_a_false_positive_falsified(tmp_path: Path) -> None:
 
         supported = load_hypothesis(store, hyp["hypothesis_id"])
         assert supported is not None
-        result = run_gate_a(supported, analysis={"source": VAULT_SOURCE}, created_at=supported["created_at"])
+        result = run_gate_a(
+            supported,
+            submission=dict(CHALLENGER_SUBMISSION_FALSIFIED),
+            created_at=supported["created_at"],
+            reviewer=STAMPED_REVIEWER,
+        )
         assert result["verdict"] == "falsified"
         assert result["cannot_mark_surface_safe"] is True
         assert result["killed_dimensions"]
         assert result["untried_dimensions"]
         assert result["record"]["gate"] == "A"
         assert result["record"]["resulting_hypothesis_status"] == "falsified"
+        assert result["record"]["reviewer"]["id"] == "rlm:chd-01j"
+        assert result["record"]["independent_from"] == [supported["hypothesis_id"]]
     finally:
         store.close()
 
@@ -59,7 +76,12 @@ def test_gate_a_true_defect_poc_worthy(tmp_path: Path) -> None:
 
         supported = load_hypothesis(store, hyp["hypothesis_id"])
         assert supported is not None
-        result = run_gate_a(supported, analysis={"source": REENTRANT_SOURCE}, created_at=supported["created_at"])
+        result = run_gate_a(
+            supported,
+            submission=dict(CHALLENGER_SUBMISSION_POC_WORTHY),
+            created_at=supported["created_at"],
+            reviewer=STAMPED_REVIEWER,
+        )
         assert result["verdict"] == "poc_worthy"
         assert result["experiment"]["capability"] == "foundry.test"
         assert result["record"]["decision"] == "advance"
@@ -76,16 +98,11 @@ def test_gate_a_missing_fact(tmp_path: Path) -> None:
             attack_path=["withdraw"],
         )
         promote_supported(store, hyp["hypothesis_id"])
-        from ayran.evidence.load import load_hypothesis
-
-        supported = load_hypothesis(store, hyp["hypothesis_id"])
-        assert supported is not None
-        result = run_gate_a(
-            supported,
-            analysis={"source": VAULT_SOURCE, "verdict": "needs_missing_fact", "missing_facts": ["pinned bytecode"]},
-            created_at=supported["created_at"],
+        result = challenger_gate_a(
+            store, hyp["hypothesis_id"], dict(CHALLENGER_SUBMISSION_MISSING_FACT)
         )
         assert result["verdict"] == "needs_missing_fact"
+        assert result["record"]["reviewer"]["kind"] == "gate"
     finally:
         store.close()
 

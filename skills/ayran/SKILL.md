@@ -87,9 +87,16 @@ an untested surface as safe; record examined vs untried dimensions.
 ## Audit workflow
 
 1. **Map** attack surface: assets, authority, value flow, time, integrations.
-2. **Hypothesize** with explicit origin and claim; write to the graph.
+2. **Hypothesize** by authoring claims yourself via the `hypotheses.remember`
+   RPC verb (origin, claim ≤2048 chars, ordered attack_path, preconditions,
+   cluster_id); your writer identity is bound to the session channel
+   server-side. There is no templated claim generator.
 3. **Gather evidence** inside scope via typed Ayran APIs and allowed tools.
 4. **Validate** through the evidence ladder and both gates when applicable.
+   Gate A verdicts come only from the independent challenger spawned through
+   `spawn_challenger` (root-side, per §7.1): the sidecar validates and seals;
+   it never spawns agents, and a caller-supplied verdict is rejected with
+   `VERDICT_OVERRIDE_FORBIDDEN`.
 5. **Report** only after validation. Report generation must not launch tools.
 
 Prefer `ayran.graph_query` / `ayran.artifact_store` (routed through the

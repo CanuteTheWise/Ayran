@@ -11,7 +11,6 @@ from ayran.context.ids import content_id
 from ayran.evidence.actors import ACTOR_EVIDENCE
 from ayran.evidence.service import (
     finding_build,
-    gate_a,
     gate_b,
     impact_assess,
     poc_run,
@@ -24,9 +23,11 @@ from ayran.graph.recovery import GraphStore
 from ayran.reporting.linter import lint
 from m5_fixtures import VAULT_SOURCE
 from m6_fixtures import (
+    CHALLENGER_SUBMISSION_POC_WORTHY,
     GATE_B_PASS,
     REENTRANT_SOURCE,
     TRUE_DEFECT_EVIDENCE,
+    challenger_gate_a,
     open_store,
     promote_supported,
     seed_hypothesis,
@@ -43,7 +44,7 @@ def _pipeline(store: GraphStore) -> dict[str, str]:
     )
     hid = str(hyp["hypothesis_id"])
     promote_supported(store, hid, TRUE_DEFECT_EVIDENCE)
-    a = gate_a(store, hid, analysis={"source": REENTRANT_SOURCE})
+    a = challenger_gate_a(store, hid, dict(CHALLENGER_SUBMISSION_POC_WORTHY))
     assert a["verdict"] == "poc_worthy"
     poc = poc_run(
         store,

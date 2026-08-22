@@ -1,13 +1,18 @@
-"""M5 six drivers: distinguishable origins, model-native without anchors."""
+"""M5 drivers: distinguishable origins. R1: the templated model_native and
+adversarial_specialist drivers are deleted (§5.1); model_novel authorship now
+flows only through hypotheses.remember (see test_r1_hypothesis_remember.py)."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from ayran.evidence.service import remember
 from ayran.hypotheses.drivers import propose_all
 from ayran.hypotheses.drivers.base import DRIVER_NAMES, DRIVER_ORIGINS
-from m5_fixtures import VAULT_SOURCE, base_view
+from m5_fixtures import base_view
 
 
-def test_six_drivers_are_distinguishable() -> None:
+def test_drivers_are_distinguishable() -> None:
     view = base_view(
         knowledge_policy="graph_aware",
         global_mechanisms=[{"id": "nod_01J0000000000000000000000A", "title": "reentrancy-pattern"}],
@@ -31,26 +36,40 @@ def test_six_drivers_are_distinguishable() -> None:
     claims = {name: tuple(results[name].distinguishable_claims()) for name in DRIVER_NAMES}
     # Each origin must produce at least one claim, and the claim sets must not collapse to one.
     assert all(claims[name] for name in DRIVER_NAMES)
-    unique_blobs = { " | ".join(claims[name]) for name in DRIVER_NAMES }
-    assert len(unique_blobs) == 6
+    unique_blobs = {" | ".join(claims[name]) for name in DRIVER_NAMES}
+    assert len(unique_blobs) == len(DRIVER_NAMES)
 
 
-def test_model_native_works_without_retrieved_or_tool_anchors() -> None:
-    view = base_view(
-        knowledge_policy="target_only",
-        global_mechanisms=[{"id": "x", "title": "should-be-ignored"}],
-        tool_runs=[{"tool_run_id": "trn_01J00000000000000000000001", "tool_name": "slither.analyze"}],
-        source_units=[{"kind": "source", "name": "Vault", "source": VAULT_SOURCE}],
-    )
-    from ayran.hypotheses.drivers.model_native import propose
+def test_model_novel_authorship_needs_no_anchors(tmp_path: Path) -> None:
+    """Replaces the deleted model_native anchor-independence driver test: the
+    remember() authorship path works from target material alone and never
+    cites retrieved or tool anchors."""
 
-    result = propose(view)
-    assert result.origin == "model_novel"
-    assert result.hypotheses
-    blob = " ".join(result.distinguishable_claims()).lower()
-    assert "historical" not in blob
-    assert "slither" not in blob
-    assert "withdraw" in blob or "deposit" in blob or "first-principles" in blob
+    from m5_fixtures import open_store
+
+    store = open_store(tmp_path)
+    try:
+        claim = (
+            "withdraw settles msg.sender after an external call, so a fallback can "
+            "double-withdraw against pooled deposits"
+        )
+        result = remember(
+            store,
+            origin="model_novel",
+            claim=claim,
+            attack_path=["enter withdraw()", "re-enter via fallback", "profit"],
+            preconditions=[{"description": "attacker fallback contract", "attacker_can_create": True}],
+            cluster_id="clus_01J00000000000000000000001",
+            writer={"kind": "model", "id": "prime:sess-01j"},
+            session="sess-01j",
+        )
+        assert result["accepted"] is True
+        blob = result.get("claim", claim).lower() + " " + claim.lower()
+        assert "historical" not in blob
+        assert "slither" not in blob
+        assert "first-principles" not in blob
+    finally:
+        store.close()
 
 
 def test_global_graph_stops_when_blind() -> None:

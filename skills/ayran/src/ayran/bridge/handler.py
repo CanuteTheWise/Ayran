@@ -26,6 +26,7 @@ from ayran.runtime.status import reconstruct_status
 from ayran.runtime.stop import stop_run
 
 if TYPE_CHECKING:
+    from ayran.gates.spawn_challenger import CredentialAuthority
     from ayran.tools.registry import CapabilityRegistry
 
 AYRAN_TOOLS = {"ayran.graph_query", "ayran.artifact_store"}
@@ -79,8 +80,62 @@ class BridgeDispatcher:
     shutdown_callback: Callable[[], None] | None = None
     last_pack_hashes: dict[str, str] = field(default_factory=dict)
     children: dict[str, dict[str, Any]] = field(default_factory=dict)
+    isolation_tampered: bool = False
+    _credentials: CredentialAuthority | None = field(default=None, repr=False)
+    _isolation_report: dict[str, Any] | None = field(default=None, repr=False)
     _lock: Lock = field(default_factory=Lock)
     _tools_registry: CapabilityRegistry | None = field(default=None, repr=False)
+
+    @property
+    def credentials(self) -> CredentialAuthority:
+        """Per-run credential authority (§11.4); lazily built to avoid import cycles."""
+
+        if self._credentials is None:
+            from ayran.gates.spawn_challenger import CredentialAuthority
+
+            self._credentials = CredentialAuthority()
+        return self._credentials
+
+    @property
+    def spool_root(self) -> Path:
+        """Sidecar-owned challenger spool, OUTSIDE the state root and included_roots."""
+
+        return self.state_root.parent / "challenger-spool"
+
+    def run_isolation_probe(self) -> dict[str, Any]:
+        """Startup/before-first-cognitive-call isolation probe (§11.2)."""
+
+        from ayran.gates.isolation import verify_isolation
+
+        report = verify_isolation(
+            state_root=self.state_root,
+            spool_root=self.spool_root,
+            included_roots=list(self.scope.included_roots) if self.scope else [],
+            transport_facts={"channel": "subprocess", "writable_roots": [], "has_sidecar_socket": False},
+            credential_grants=["gate_a_submission"],
+            tampered=self.isolation_tampered,
+        )
+        self._isolation_report = report
+        return report
+
+    def isolation_report(self) -> dict[str, Any]:
+        if self._isolation_report is None:
+            return self.run_isolation_probe()
+        return self._isolation_report
+
+    def _require_isolation(self) -> None:
+        """Fail-closed: cognitive methods refuse until a passing probe exists."""
+
+        from ayran.evidence.errors import ISOLATION_UNVERIFIED, EvidenceError
+
+        report = self.isolation_report()
+        if not report.get("verified"):
+            raise EvidenceError(
+                ISOLATION_UNVERIFIED,
+                "challenger isolation is unverified; cognitive methods refuse until a "
+                f"passing probe exists: {report.get('refusals') or ['unknown']}",
+                details={"refusals": report.get("refusals") or []},
+            )
 
     def dispatch(self, method: str, params: dict[str, Any]) -> Any:
         handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
@@ -116,6 +171,8 @@ class BridgeDispatcher:
             "evidence.transition": self.evidence_transition,
             "evidence.gate_a": self.evidence_gate_a,
             "evidence.gate_b": self.evidence_gate_b,
+            "hypotheses.remember": self.hypotheses_remember,
+            "challenger.prepare": self.challenger_prepare,
             "evidence.dedup_check": self.evidence_dedup_check,
             "evidence.impact_assess": self.evidence_impact_assess,
             "evidence.severity_assess": self.evidence_severity_assess,
@@ -397,20 +454,209 @@ class BridgeDispatcher:
         except EvidenceError as error:
             return error.as_result()
 
+    def _journal_denial(self, event_type: str, *, session_id: str, reason: str) -> None:
+        try:
+            record_session_event(
+                self.store,
+                run_id=self.run_id,
+                event_type=event_type,
+                payload={"reason": reason[:512], "session_id": session_id[:128]},
+            )
+        except Exception as error:  # a journaling failure must never mask the denial itself
+            self.logger.event(
+                "WARN",
+                "bridge.denial_journal_failed",
+                method=event_type,
+                error=type(error).__name__,
+            )
+
+    def _derive_writer(self, params: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        """Writer identity derived SERVER-SIDE from the channel credential mapping (§11.4)."""
+
+        from ayran.evidence.errors import CREDENTIAL_DENIED, WRITER_IMPERSONATION, EvidenceError
+        from ayran.gates.spawn_challenger import (
+            CREDENTIAL_GRANT_REMEMBER,
+            CredentialError,
+        )
+
+        session = str(params.get("session") or self.run_id)
+        raw_credential = params.get("credential") or params.get("writer_credential")
+        if raw_credential:
+            try:
+                payload = self.credentials.verify(str(raw_credential), grant=CREDENTIAL_GRANT_REMEMBER)
+            except CredentialError as error:
+                raise EvidenceError(
+                    CREDENTIAL_DENIED,
+                    f"writer credential refused: {error.reason}",
+                    details=error.as_dict(),
+                ) from error
+            bound = payload.get("writer") or {}
+            writer = {"kind": str(bound.get("kind") or ""), "id": str(bound.get("id") or "")}
+        else:
+            # The authenticated owner channel maps to the root model writer of the session.
+            writer = {"kind": "model", "id": f"prime:{session}"}
+        supplied = params.get("writer")
+        if isinstance(supplied, dict) and (
+            str(supplied.get("kind") or ""),
+            str(supplied.get("id") or ""),
+        ) != (writer["kind"], writer["id"]):
+            raise EvidenceError(
+                WRITER_IMPERSONATION,
+                "client-supplied writer does not match the channel-bound identity",
+                details={"bound": writer, "supplied": supplied},
+            )
+        return writer, session
+
+    def hypotheses_remember(self, params: dict[str, Any]) -> dict[str, Any]:
+        from ayran.evidence.errors import (
+            ISOLATION_UNVERIFIED,
+            ORIGIN_WRITER_DENIED,
+            WRITER_IMPERSONATION,
+            EvidenceError,
+        )
+        from ayran.evidence.service import remember
+
+        self._require_write(params)
+        try:
+            self._require_isolation()
+            writer, session = self._derive_writer(params)
+        except EvidenceError as error:
+            event = (
+                "writer_impersonation_denied"
+                if error.code == WRITER_IMPERSONATION
+                else "writer_credential_denied"
+                if error.code != ISOLATION_UNVERIFIED
+                else "isolation_refusal"
+            )
+            self._journal_denial(
+                event,
+                session_id=str(params.get("session") or self.run_id),
+                reason=f"{error.code}: {error.message}",
+            )
+            return error.as_result()
+        preconditions = params.get("preconditions")
+        try:
+            return remember(
+                self.store,
+                origin=str(params.get("origin") or ""),
+                claim=str(params.get("claim") or ""),
+                attack_path=[str(item) for item in (params.get("attack_path") or [])],
+                preconditions=preconditions if isinstance(preconditions, list) else [],
+                violated_invariant=str(params["violated_invariant"]) if params.get("violated_invariant") else None,
+                cluster_id=str(params.get("cluster_id") or ""),
+                writer=writer,
+                session=session,
+                pack_hash=str(params["pack_hash"]) if params.get("pack_hash") else None,
+            )
+        except EvidenceError as error:
+            if error.code == ORIGIN_WRITER_DENIED:
+                self._journal_denial(
+                    "origin_writer_denied", session_id=session, reason=error.message
+                )
+            return error.as_result()
+
     def evidence_gate_a(self, params: dict[str, Any]) -> dict[str, Any]:
-        from ayran.evidence.errors import EvidenceError
+        from ayran.evidence.errors import (
+            CREDENTIAL_DENIED,
+            ISOLATION_UNVERIFIED,
+            VERDICT_OVERRIDE_FORBIDDEN,
+            EvidenceError,
+        )
         from ayran.evidence.service import gate_a
 
         self._require_write(params)
         analysis = params.get("analysis")
+        submission = params.get("submission")
+        credential = params.get("credential") or params.get("challenger_credential")
         try:
+            self._require_isolation()
             return gate_a(
                 self.store,
                 str(params.get("hypothesis_id") or ""),
                 analysis=analysis if isinstance(analysis, dict) else None,
+                submission=submission if isinstance(submission, dict) else None,
+                credential=str(credential) if credential else None,
+                credentials=self.credentials,
                 reconcile=bool(params.get("reconcile")),
+                transcript_hash=str(params["transcript_hash"]) if params.get("transcript_hash") else None,
             )
         except EvidenceError as error:
+            if error.code == VERDICT_OVERRIDE_FORBIDDEN:
+                self._journal_denial(
+                    "verdict_override_denied",
+                    session_id=str(params.get("session") or self.run_id),
+                    reason=f"{error.code}: {error.message}",
+                )
+            elif error.code == CREDENTIAL_DENIED:
+                self._journal_denial(
+                    "challenger_credential_denied",
+                    session_id=str(params.get("session") or self.run_id),
+                    reason=f"{error.code}: {error.message}",
+                )
+            elif error.code == ISOLATION_UNVERIFIED:
+                self._journal_denial(
+                    "isolation_refusal",
+                    session_id=str(params.get("session") or self.run_id),
+                    reason=f"{error.code}: {error.message}",
+                )
+            return error.as_result()
+
+    def challenger_prepare(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Root-skill Gate A preparation: blind bundle + per-spawn credential.
+
+        The sidecar never spawns agents: this mints the short-TTL child-bound
+        credential (§11.4) and returns the knowledge-blind bundle (§5.5) so the
+        root skill can drive the challenger round trip itself.
+        """
+
+        from ayran.evidence.errors import (
+            HYPOTHESIS_NOT_FOUND,
+            SUBMISSION_INVALID,
+            EvidenceError,
+        )
+        from ayran.gates.spawn_challenger import build_challenger_bundle
+
+        self._require_write(params)
+        child_id = str(params.get("child_id") or "")
+        hypothesis_id = str(params.get("hypothesis_id") or "")
+        try:
+            self._require_isolation()
+            if not child_id:
+                raise EvidenceError(
+                    SUBMISSION_INVALID, "challenger.prepare requires child_id"
+                )
+            try:
+                bundle = build_challenger_bundle(self.store, hypothesis_id)
+            except LookupError as error:
+                raise EvidenceError(
+                    HYPOTHESIS_NOT_FOUND,
+                    f"hypothesis {hypothesis_id} was not found",
+                ) from error
+            token = self.credentials.mint_challenger(child_id=child_id)
+            record_session_event(
+                self.store,
+                run_id=self.run_id,
+                event_type="challenger_credential_minted",
+                payload={
+                    "reason": f"per-spawn credential minted for rlm:{child_id}",
+                    "session_id": str(params.get("session") or self.run_id)[:128],
+                },
+            )
+            return {
+                "schema_version": "1.0.0",
+                "child_id": child_id,
+                "hypothesis_id": hypothesis_id,
+                "credential": token,
+                "bundle": bundle,
+                "isolation": self.isolation_report(),
+                "spool_root": str(self.spool_root),
+            }
+        except EvidenceError as error:
+            self._journal_denial(
+                "challenger_prepare_denied",
+                session_id=str(params.get("session") or self.run_id),
+                reason=f"{error.code}: {error.message}",
+            )
             return error.as_result()
 
     def evidence_gate_b(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -1152,7 +1398,7 @@ def build_dispatcher(
 ) -> BridgeDispatcher:
     scope = load_run_scope(run_root)
     policy = PolicyEngine(scope, config=config)
-    return BridgeDispatcher(
+    dispatcher = BridgeDispatcher(
         run_id=run_id,
         config=config,
         store=store,
@@ -1166,3 +1412,14 @@ def build_dispatcher(
         run_root=run_root,
         shutdown_callback=shutdown_callback,
     )
+    # §11.2: isolation verification runs at startup; failure is fail-closed for
+    # cognitive verbs (they re-check before the first cognitive call).
+    probe = dispatcher.run_isolation_probe()
+    logger.event(
+        "INFO" if probe.get("verified") else "WARN",
+        "bridge.isolation_probe",
+        mode=probe.get("mode"),
+        verified=bool(probe.get("verified")),
+        refusals=";".join(probe.get("refusals") or []) or None,
+    )
+    return dispatcher

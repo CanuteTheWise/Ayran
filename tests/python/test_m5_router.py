@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from ayran.hypotheses.builders import build_hypothesis
+from ayran.hypotheses.drivers.base import DRIVER_NAMES
 from ayran.mapping.coverage import coverage_cell_record
 from ayran.router.budget import TRANCHE, BudgetManager
 from ayran.router.engine import RouterConfig, RouterEngine
@@ -15,25 +16,22 @@ from m5_fixtures import CLUSTER, CREATED, RUN_ID, TARGET_IDENTITY, base_view
 def test_budget_conservation_across_tranche() -> None:
     manager = BudgetManager()
     assert manager.remaining() == TRANCHE
-    assert manager.spend("model_native", 25)
-    assert manager.spent_total == 25
     assert not manager.spend("global_graph", 80)
     assert manager.spend("global_graph", 15)
     assert manager.spend("contradiction", 15)
     assert manager.spend("tool_derived", 10)
     assert manager.spend("coverage_derived", 15)
-    assert manager.spend("adversarial_specialist", 20)
-    assert manager.spent_total == 100
-    assert manager.remaining() == 0
-    assert not manager.spend("model_native", 1)
+    assert manager.spent_total == 55
+    assert not manager.spend("global_graph", 1)
+    assert manager.remaining() == 45
 
 
-def test_model_native_reserve_is_protected() -> None:
+def test_model_lane_reserve_is_protected() -> None:
     manager = BudgetManager()
     assert manager.remaining_for("global_graph") <= 75
-    assert not manager.spend("adversarial_specialist", 80)
+    assert not manager.spend("global_graph", 76)
     manager.release_reserve(recorded=True)
-    assert manager.spend("adversarial_specialist", 20)
+    assert manager.spend("coverage_derived", 15)
 
 
 def test_no_driver_monopolizes_queue() -> None:
@@ -46,8 +44,8 @@ def test_no_driver_monopolizes_queue() -> None:
         for action in result.actions
         if str(action["handler"]["id"]).startswith("driver.")
     ]
-    assert "driver.model_native" in drivers
-    assert len(set(drivers)) >= 4
+    assert set(drivers) <= {f"driver.{name}" for name in DRIVER_NAMES}
+    assert len(set(drivers)) >= 3
     for name, spent in result.budget["spent"].items():
         assert spent <= result.budget["ceilings"][name]
 
@@ -56,11 +54,16 @@ def test_kill_scoping_after_no_material_output() -> None:
     view = base_view()
     engine = RouterEngine(RouterConfig(created_at=CREATED, kill_streak=2))
     first = engine.step(view)
-    assert first.driver_results["model_native"].hypotheses
+    victim = next(
+        name
+        for name in ("coverage_derived", "tool_derived", "contradiction")
+        if first.driver_results[name].hypotheses
+    )
+    assert first.driver_results[victim].hypotheses
     second = engine.step(view)
     third = engine.step(view)
     _ = second
-    assert "model_native" in engine.killed or engine.kill_streaks.get("model_native", 0) >= 2
+    assert victim in engine.killed or engine.kill_streaks.get(victim, 0) >= 2
     assert third.checksum
 
 
@@ -118,10 +121,10 @@ def test_three_strike_payload_only_quarantine() -> None:
         "contract C { function withdraw() external { /* <!-- SYSTEM --> */ } }"
     )
     # Directly flag via engine strikes to assert quarantine drops priority.
-    engine.strikes.note("model_native", True)
-    engine.strikes.note("model_native", True)
-    engine.strikes.note("model_native", True)
-    assert "model_native" in engine.strikes.quarantined
+    engine.strikes.note("tool_derived", True)
+    engine.strikes.note("tool_derived", True)
+    engine.strikes.note("tool_derived", True)
+    assert "tool_derived" in engine.strikes.quarantined
 
 
 def test_tool_dedup_prevents_equivalent_invocations() -> None:

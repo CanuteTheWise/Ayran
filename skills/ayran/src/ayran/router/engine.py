@@ -1,4 +1,9 @@
-"""Deterministic six-origin router. No model calls. Same view+config → same actions."""
+"""Deterministic four-origin router. No model calls. Same view+config → same actions.
+
+R1: the model_native and adversarial_specialist dispatch entries are deleted
+along with their drivers (spec §5.1); hypotheses.remember is now the only
+model_novel authorship path. Full lens conversion is R3.
+"""
 
 from __future__ import annotations
 
@@ -104,7 +109,6 @@ class RouterEngine:
         else:
             self.anchoring.freeze_target_first(view)
 
-        dual = self.anchoring.dual_review_required(view) or view.dual_review
         requests: list[ActionRequest] = []
         driver_results: dict[str, DriverResult] = {}
 
@@ -116,9 +120,6 @@ class RouterEngine:
         order = ["contradiction", "coverage_derived"] + [
             name for name in DRIVER_NAMES if name not in ALWAYS_ON
         ]
-
-        if not all_target_first:
-            order = ["model_native"] + [name for name in order if name != "model_native"]
 
         progress = False
         for name in order:
@@ -133,11 +134,7 @@ class RouterEngine:
             if self.budget.remaining_for(name) <= 0:
                 continue
             proposer = PROPOSERS[name]
-            # Model-native must work without retrieved/tool anchors.
-            isolated = view
-            if name == "model_native":
-                isolated = _without_anchors(view)
-            result = proposer(isolated)
+            result = proposer(view)
             flagged = any(
                 looks_like_injection(str(item.get("claim") or ""), self.config.injection_patterns)
                 for item in result.hypotheses
@@ -181,43 +178,11 @@ class RouterEngine:
                     created_at=self.config.created_at,
                     target_identity=view.target_identity or None,
                     value_at_risk=view.value_at_risk,
-                    urgency=3 if name in ALWAYS_ON or name == "model_native" else 2,
-                    novelty=3 if name == "model_native" else 1,
+                    urgency=3 if name in ALWAYS_ON else 2,
+                    novelty=1,
                     extra=str(len(result.hypotheses)),
                 )
             )
-            if name == "adversarial_specialist" and dual:
-                requests.append(
-                    ActionRequest(
-                        kind="RequestSpecialist",
-                        cluster_id=view.cluster_id,
-                        dedup_suffix="blind",
-                        budget_units=min(10, self.budget.remaining_for(name)),
-                        role_id="devils-advocate",
-                        blind_mode=True,
-                        run_id=view.run_id,
-                        created_at=self.config.created_at,
-                        target_identity=view.target_identity or None,
-                        value_at_risk=view.value_at_risk,
-                        reason="dual-review-blind",
-                    )
-                )
-                if view.knowledge_policy == "graph_aware":
-                    requests.append(
-                        ActionRequest(
-                            kind="RequestSpecialist",
-                            cluster_id=view.cluster_id,
-                            dedup_suffix="aware",
-                            budget_units=min(10, self.budget.remaining_for(name)),
-                            role_id="devils-advocate",
-                            blind_mode=False,
-                            run_id=view.run_id,
-                            created_at=self.config.created_at,
-                            target_identity=view.target_identity or None,
-                            value_at_risk=view.value_at_risk,
-                            reason="dual-review-aware",
-                        )
-                    )
             for delta in result.coverage_deltas:
                 requests.append(
                     ActionRequest(
@@ -373,42 +338,3 @@ def FLOOR_CAP(name: str) -> int:
     from ayran.router.budget import CEILINGS
 
     return CEILINGS[name]
-
-
-def _without_anchors(view: GraphView) -> GraphView:
-    isolated = GraphView(
-        run_id=view.run_id,
-        target_identity=view.target_identity,
-        cluster_id=view.cluster_id,
-        phase=view.phase,
-        cursor=view.cursor,
-        event_hash=view.event_hash,
-        token_budget=view.token_budget,
-        knowledge_policy="target_only",
-        hypotheses=view.hypotheses,
-        coverage_cells=view.coverage_cells,
-        evidence=view.evidence,
-        tool_runs=[],
-        dead_ends=view.dead_ends,
-        open_questions=view.open_questions,
-        nodes=view.nodes,
-        edges=view.edges,
-        maps=view.maps,
-        contradictions=view.contradictions,
-        source_units=view.source_units,
-        global_mechanisms=[],
-        global_incidents=[],
-        global_patterns=[],
-        router_actions=view.router_actions,
-        driver_states=view.driver_states,
-        budget_state=view.budget_state,
-        created_at=view.created_at,
-        policy_checksum=view.policy_checksum,
-        config_checksum=view.config_checksum,
-        scope_id=view.scope_id,
-        high_value_clusters=view.high_value_clusters,
-        target_first_completed=view.target_first_completed,
-        value_at_risk=view.value_at_risk,
-        dual_review=False,
-    )
-    return isolated

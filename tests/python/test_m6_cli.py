@@ -8,8 +8,6 @@ from pathlib import Path
 from ayran.cli import main as cli_main
 from m5_fixtures import VAULT_SOURCE, write_stream
 from m6_fixtures import (
-    REENTRANT_SOURCE,
-    TRUE_DEFECT_EVIDENCE,
     open_store,
     promote_supported,
     seed_hypothesis,
@@ -30,7 +28,11 @@ def _graph_args(root: Path, stream: Path) -> list[str]:
     return ["--graph-root", str(root), "--stream", str(stream), "--allow-unsafe-filesystem"]
 
 
-def test_cli_gate_a_false_positive_and_true_defect(tmp_path: Path) -> None:
+def test_cli_gate_a_forced_verdict_shape_rejected(tmp_path: Path) -> None:
+    """R1: the CLI verdict channels are dead. The old forced shape fails closed
+    with VERDICT_OVERRIDE_FORBIDDEN; a source-only analysis cannot reach a
+    verdict because only credentialed challenger submissions enter Gate A."""
+
     store = open_store(tmp_path)
     try:
         fp = seed_hypothesis(
@@ -40,26 +42,25 @@ def test_cli_gate_a_false_positive_and_true_defect(tmp_path: Path) -> None:
             root_cause="arbitrary-send-eth",
         )
         promote_supported(store, fp["hypothesis_id"])
-        tp = seed_hypothesis(
-            store,
-            claim="ReentrantVault.withdraw is reentrant because the external call happens before balances are zeroed",
-            attack_path=["withdraw"],
-            root_cause="reentrancy",
-        )
-        promote_supported(store, tp["hypothesis_id"], TRUE_DEFECT_EVIDENCE)
         root, stream = write_stream(tmp_path, store)
     finally:
         store.close()
     code, output = _invoke(
+        [
+            "gate-a",
+            fp["hypothesis_id"],
+            *_graph_args(root, stream),
+            "--analysis",
+            json.dumps({"source": VAULT_SOURCE, "verdict": "poc_worthy"}),
+        ]
+    )
+    assert code == 2, output
+    assert "VERDICT_OVERRIDE_FORBIDDEN" in output
+    code, output = _invoke(
         ["gate-a", fp["hypothesis_id"], *_graph_args(root, stream), "--analysis", json.dumps({"source": VAULT_SOURCE})]
     )
-    assert code == 0, output
-    assert "falsified" in output
-    code, output = _invoke(
-        ["gate-a", tp["hypothesis_id"], *_graph_args(root, stream), "--analysis", json.dumps({"source": REENTRANT_SOURCE})]
-    )
-    assert code == 0, output
-    assert "poc_worthy" in output
+    assert code == 2, output
+    assert "SUBMISSION_INVALID" in output
     code, trans = _invoke(
         [
             "evidence",

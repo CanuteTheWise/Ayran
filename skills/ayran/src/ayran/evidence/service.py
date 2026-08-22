@@ -14,15 +14,19 @@ from ayran.evidence.actors import (
     ACTOR_DEDUP,
     ACTOR_EVIDENCE,
     ACTOR_FINDING,
-    ACTOR_GATE_A,
     ACTOR_GATE_B,
     ACTOR_POC,
 )
 from ayran.evidence.dedup import check_duplicates
 from ayran.evidence.errors import (
+    CREDENTIAL_DENIED,
     FINDING_NOT_FOUND,
     HYPOTHESIS_NOT_FOUND,
+    ORIGIN_WRITER_DENIED,
     POC_NOT_FOUND,
+    REMEMBER_CONTRACT_INVALID,
+    SUBMISSION_INVALID,
+    VERDICT_OVERRIDE_FORBIDDEN,
     EvidenceError,
 )
 from ayran.evidence.finding import build_finding
@@ -50,15 +54,40 @@ from ayran.evidence.poc import (
     request_from_hypothesis,
 )
 from ayran.evidence.severity import assess_severity
-from ayran.evidence.state_machine import HypothesisStateMachine
+from ayran.evidence.state_machine import HypothesisStateMachine, TransitionDecision
 from ayran.evidence.types import DEFAULT_SEVERITY_POLICY_ID
 from ayran.gates.gate_a import run_gate_a
 from ayran.gates.gate_b import run_gate_b
+from ayran.graph.canonical import utc_now
 from ayran.graph.recovery import GraphStore
+from ayran.hypotheses.builders import build_hypothesis
+from ayran.hypotheses.dedup import hypothesis_key
 from ayran.reporting.linter import lint as lint_report
 from ayran.reporting.renderer import render as render_report
 
 MACHINE = HypothesisStateMachine()
+
+REMEMBER_ORIGINS = (
+    "model_novel",
+    "global_graph",
+    "contradiction",
+    "tool",
+    "coverage",
+    "specialist",
+)
+REMEMBER_CLAIM_MAX = 2048
+# None means "any schema-valid writer kind may create this origin".
+ORIGIN_WRITER_ALLOWLIST: dict[str, frozenset[str] | None] = {
+    "model_novel": frozenset({"model", "specialist"}),
+    "specialist": frozenset({"model", "specialist"}),
+    "global_graph": frozenset({"service"}),
+    "tool": frozenset({"service"}),
+    "coverage": frozenset({"service"}),
+    "contradiction": None,
+}
+WRITER_KINDS = frozenset(
+    {"human", "model", "service", "tool", "specialist", "gate", "router", "importer"}
+)
 
 
 def _view_dict(store: GraphStore, cluster_id: str | None = None) -> dict[str, Any]:
@@ -198,24 +227,269 @@ def _auto_transition_from_gate(
         return error.as_result()
 
 
+def _remember_provenance(
+    *, hypothesis_id: str, writer: dict[str, Any], session: str, pack_hash: str | None, stamp: str
+) -> dict[str, Any]:
+    from ayran.context.ids import ZERO_HASH
+
+    raw_hash = pack_hash if isinstance(pack_hash, str) and pack_hash.startswith("sha256:") else ZERO_HASH
+    return {
+        "provenance_id": content_id("prv", hypothesis_id, "remember", session, stamp),
+        "source_uri": "urn:ayran:r1:remember",
+        "source_version": "1.0.0",
+        "raw_hash": raw_hash,
+        "retrieved_at": stamp,
+        "license_or_terms": "ayran-internal-projection",
+        "extraction_locator": (
+            f"hypotheses.remember:session={session}:writer={writer.get('kind')}:{writer.get('id')}"
+        )[:512],
+        "transformation_lineage": [],
+    }
+
+
+def _validate_remember_preconditions(preconditions: Any) -> list[dict[str, Any]]:
+    if not isinstance(preconditions, list) or not preconditions:
+        raise EvidenceError(
+            REMEMBER_CONTRACT_INVALID,
+            "preconditions must be a non-empty list of {description, attacker_can_create}",
+        )
+    cleaned: list[dict[str, Any]] = []
+    for item in preconditions[:64]:
+        if not isinstance(item, dict):
+            raise EvidenceError(REMEMBER_CONTRACT_INVALID, "each precondition must be an object")
+        description = str(item.get("description") or "").strip()
+        if not description:
+            raise EvidenceError(
+                REMEMBER_CONTRACT_INVALID, "precondition description must be non-empty"
+            )
+        can_create = item.get("attacker_can_create")
+        if can_create is not None and not isinstance(can_create, bool):
+            raise EvidenceError(
+                REMEMBER_CONTRACT_INVALID, "attacker_can_create must be boolean or null"
+            )
+        cleaned.append({"description": description[:1024], "attacker_can_create": can_create})
+    return cleaned
+
+
+def remember(
+    store: GraphStore,
+    *,
+    origin: str,
+    claim: str,
+    attack_path: list[str],
+    preconditions: list[dict[str, Any]],
+    cluster_id: str,
+    violated_invariant: str | None = None,
+    writer: dict[str, Any],
+    session: str = "",
+    pack_hash: str | None = None,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    """Create one model-authored Hypothesis node at status ``lead`` (spec §5.1).
+
+    Writer identity is derived server-side from the authenticated channel
+    credential mapping by the RPC boundary and is enforced here against the
+    origin-writer allowlist. Creation is an initial state, not a transition;
+    ``state_machine.py`` and ``AUTHORIZED_KINDS`` are untouched.
+    """
+
+    if origin not in REMEMBER_ORIGINS:
+        raise EvidenceError(
+            REMEMBER_CONTRACT_INVALID,
+            f"origin {origin!r} is not one of {list(REMEMBER_ORIGINS)}",
+        )
+    claim_text = str(claim or "").strip()
+    if not claim_text:
+        raise EvidenceError(REMEMBER_CONTRACT_INVALID, "claim must be non-empty")
+    if len(claim_text) > REMEMBER_CLAIM_MAX:
+        raise EvidenceError(
+            REMEMBER_CONTRACT_INVALID,
+            f"claim exceeds {REMEMBER_CLAIM_MAX} characters (got {len(claim_text)})",
+        )
+    writer_kind = str((writer or {}).get("kind") or "")
+    writer_id = str((writer or {}).get("id") or "")
+    if writer_kind not in WRITER_KINDS or not writer_id:
+        raise EvidenceError(
+            REMEMBER_CONTRACT_INVALID,
+            "writer must carry a schema-valid {kind, id} identity",
+        )
+    allowed = ORIGIN_WRITER_ALLOWLIST.get(origin)
+    if allowed is not None and writer_kind not in allowed:
+        raise EvidenceError(
+            ORIGIN_WRITER_DENIED,
+            f"origin {origin!r} may not be authored by writer kind {writer_kind!r}; "
+            f"allowed kinds are {sorted(allowed)}",
+            details={"origin": origin, "writer_kind": writer_kind},
+        )
+    path = [str(step).strip() for step in (attack_path or []) if str(step).strip()]
+    if not path:
+        raise EvidenceError(
+            REMEMBER_CONTRACT_INVALID, "attack_path must list ordered entry/mutation/profit steps"
+        )
+    cleaned_preconditions = _validate_remember_preconditions(preconditions)
+    cluster = str(cluster_id or "").strip()
+    if not cluster:
+        raise EvidenceError(REMEMBER_CONTRACT_INVALID, "cluster_id must be non-empty")
+
+    run_id = str(store.stream.get("run_id") or "")
+    stamp = created_at or utc_now()
+    candidate = build_hypothesis(
+        origin=origin,
+        claim=claim_text,
+        cluster_id=cluster,
+        run_id=run_id,
+        created_at=stamp,
+        attack_path=path,
+        target_entities=[],
+        preconditions=[item["description"] for item in cleaned_preconditions],
+        novelty="no_known_precedent" if origin == "model_novel" else "unknown",
+        trust_class="model_observation",
+        root_cause="",
+        state=cluster,
+        attacker="unprivileged",
+        target_identity=None,
+    )
+    # Server-side dedup pre-insert via hypotheses.dedup.hypothesis_key (§5.1).
+    dedup_key = hypothesis_key({key: value for key, value in candidate.items() if key != "_triple"})
+    for existing in load_hypotheses(store):
+        existing_key = hypothesis_key(existing)
+        triple_key = hypothesis_key(candidate) if existing.get("_triple") else None
+        if existing_key == dedup_key or (triple_key and existing_key == triple_key):
+            return {
+                "accepted": True,
+                "hypothesis_id": str(existing.get("hypothesis_id")),
+                "dedup_result": {
+                    "status": "duplicate",
+                    "duplicate_of": str(existing.get("hypothesis_id")),
+                    "key": dedup_key,
+                },
+                "writer": {"kind": writer_kind, "id": writer_id},
+                "status": str(existing.get("status") or "lead"),
+            }
+
+    writer_actor = {"kind": writer_kind, "id": writer_id, "version": "1.0.0"}
+    candidate["transition_history"] = [
+        {**candidate["transition_history"][0], "actor": dict(writer_actor)}
+    ]
+    for slot, item in zip(candidate["preconditions"], cleaned_preconditions, strict=False):
+        slot["attacker_can_create"] = item["attacker_can_create"]
+    if violated_invariant:
+        candidate["invariant_ids"] = [content_id("inv", violated_invariant)][:256]
+    candidate["provenance"] = [
+        *(candidate.get("provenance") or []),
+        _remember_provenance(
+            hypothesis_id=str(candidate["hypothesis_id"]),
+            writer=writer_actor,
+            session=session,
+            pack_hash=pack_hash,
+            stamp=stamp,
+        )
+    ]
+    decision = TransitionDecision(
+        accepted=True,
+        current="lead",
+        target="lead",
+        demotion=False,
+        reason="model-authored hypothesis created via hypotheses.remember",
+        next_grade="lead",
+        kind="snapshot",
+    )
+    event_id = str(candidate["transition_history"][0]["event_id"])
+    persist_hypothesis_revision(
+        store,
+        candidate,
+        actor=writer_actor,
+        decision=decision,
+        event_id=event_id,
+        created_at=stamp,
+    )
+    return {
+        "accepted": True,
+        "hypothesis_id": str(candidate["hypothesis_id"]),
+        "dedup_result": {"status": "unique", "key": dedup_key},
+        "writer": {"kind": writer_kind, "id": writer_id},
+        "status": "lead",
+        "run_id": run_id,
+        "acknowledged_at": stamp,
+    }
+
+
 def gate_a(
     store: GraphStore,
     hypothesis_id: str,
     *,
     analysis: dict[str, Any] | None = None,
+    submission: dict[str, Any] | None = None,
+    credential: str | None = None,
+    credentials: Any = None,
     reconcile: bool = False,
+    transcript_hash: str | None = None,
 ) -> dict[str, Any]:
+    """Seal one challenger-submitted Gate A verdict (§5.5, S9.2).
+
+    The caller-supplied verdict channel is deleted: an ``analysis`` payload
+    carrying ``verdict``/``proposed_verdict`` fails with
+    ``VERDICT_OVERRIDE_FORBIDDEN`` before any state change. Reviewer identity is
+    stamped HERE from the verified per-spawn credential (``rlm:<child-id>``),
+    never accepted as a caller parameter. The blind verdict record is sealed
+    before any reconciliation attaches.
+    """
+
+    from ayran.gates.spawn_challenger import CREDENTIAL_GRANT_GATE_A, CredentialError
+
     hypothesis = _require_hypothesis(store, hypothesis_id)
-    view = _view_dict(store)
+    if isinstance(analysis, dict) and ("verdict" in analysis or "proposed_verdict" in analysis):
+        raise EvidenceError(
+            VERDICT_OVERRIDE_FORBIDDEN,
+            "the caller-supplied verdict channel is deleted (§5.5); verdicts enter "
+            "only via the credentialed challenger submission",
+            details={"hypothesis_id": hypothesis_id},
+        )
+    stamped: dict[str, Any] | None = None
+    presented: str | None = None
+    authority = credentials
+    if submission is not None:
+        if not isinstance(credential, str) or not credential:
+            raise EvidenceError(
+                SUBMISSION_INVALID,
+                "a challenger submission requires its per-spawn credential; "
+                "reviewer identity is stamped from the credential, never caller-supplied",
+            )
+        if authority is None:
+            # Fail closed: a fresh unknown-key authority refuses every token.
+            from ayran.gates.spawn_challenger import CredentialAuthority
+
+            authority = CredentialAuthority()
+        try:
+            payload = authority.verify(credential, grant=CREDENTIAL_GRANT_GATE_A)
+        except CredentialError as error:
+            raise EvidenceError(
+                CREDENTIAL_DENIED,
+                f"challenger credential refused: {error.reason}",
+                details=error.as_dict(),
+            ) from error
+        child_id = str(payload.get("child_id") or "")
+        stamped = {"kind": "gate", "id": f"rlm:{child_id}", "version": "1.0.0"}
+        presented = credential
     result = run_gate_a(
         hypothesis,
-        view=view,
-        analysis=analysis,
+        submission=submission if isinstance(submission, dict) else None,
+        analysis=analysis if isinstance(analysis, dict) else None,
         created_at=str(hypothesis.get("created_at") or ""),
         reconcile=reconcile,
+        reviewer=stamped,
+        transcript_hash=transcript_hash,
     )
     record = result["record"]
-    persist_contract(store, "da-verdict", record, actor=ACTOR_GATE_A, event_stem="da_verdict")
+    reviewer_actor = {
+        "kind": str(record["reviewer"].get("kind") or "gate"),
+        "id": str(record["reviewer"].get("id") or "ayran.gate_a"),
+        "version": "1.0.0",
+    }
+    persist_contract(store, "da-verdict", record, actor=reviewer_actor, event_stem="da_verdict")
+    # Revoked at the verdict seal: the credential granted exactly one submission.
+    if presented is not None and credentials is not None:
+        credentials.consume(presented)
     evidence = {
         "gate_a_verdict_id": record["verdict_id"],
         "experiment": result.get("experiment") or {"inputs": ["n/a"]},
@@ -227,10 +501,18 @@ def gate_a(
         "evidence_ids": [record["verdict_id"]],
     }
     moved = _auto_transition_from_gate(
-        store, hypothesis, str(result["verdict"]), actor=ACTOR_GATE_A, evidence=evidence
+        store, hypothesis, str(result["verdict"]), actor=reviewer_actor, evidence=evidence
     )
     result["transition"] = moved
     result["verdict_id"] = record["verdict_id"]
+    if reconcile:
+        # Blind-first: reconciliation attaches only AFTER the blind verdict is sealed.
+        result["reconciliation"] = {
+            "considered_global": True,
+            "historical_matches": [],
+            "blind_verdict_id": record["verdict_id"],
+            "note": "reconciliation runs only after the blind verdict is sealed",
+        }
     return result
 
 

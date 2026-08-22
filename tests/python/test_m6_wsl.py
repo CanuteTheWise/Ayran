@@ -20,11 +20,12 @@ from ayran.graph.recovery import GraphStore
 from ayran.process.supervisor import ProcessSupervisor
 from ayran.runtime.logs import StructuredLogger
 from m3_fixtures import scope_value
-from m5_fixtures import RUN_ID, TARGET_IDENTITY, TARGET_KEY, VAULT_SOURCE
+from m5_fixtures import RUN_ID, TARGET_IDENTITY, TARGET_KEY
 from m6_fixtures import (
+    CHALLENGER_SUBMISSION_FALSIFIED,
+    CHALLENGER_SUBMISSION_POC_WORTHY,
     GATE_B_PASS,
     REENTRANT_PROJECT,
-    REENTRANT_SOURCE,
     TRUE_DEFECT_EVIDENCE,
     seed_hypothesis,
 )
@@ -52,7 +53,7 @@ def _scope() -> dict[str, Any]:
     return value
 
 
-def _start(tmp_path: Path) -> tuple[AyranServer, Path, bytes, GraphStore]:
+def _start(tmp_path: Path) -> tuple[AyranServer, Path, bytes, GraphStore, Any]:
     namespace = TargetNamespace(
         tmp_path / "graph",
         RUN_ID,
@@ -91,11 +92,18 @@ def _start(tmp_path: Path) -> tuple[AyranServer, Path, bytes, GraphStore]:
     dispatcher.shutdown_callback = server.stop
     server.start_background()
     time.sleep(0.05)
-    return server, sock, token, store
+    return server, sock, token, store, dispatcher
+
+
+def _challenger_credential(dispatcher: Any, child_id: str = "chd-01j") -> str:
+    """Mint the per-spawn credential from the dispatcher's own authority."""
+
+    token: str = dispatcher.credentials.mint_challenger(child_id=child_id)
+    return token
 
 
 def test_wsl_false_positive_gate_a(tmp_path: Path) -> None:
-    server, sock, token, store = _start(tmp_path)
+    server, sock, token, store, dispatcher = _start(tmp_path)
     try:
         hyp = seed_hypothesis(
             store,
@@ -120,7 +128,8 @@ def test_wsl_false_positive_gate_a(tmp_path: Path) -> None:
         verdict = client.call(
             "evidence.gate_a",
             hypothesis_id=hyp["hypothesis_id"],
-            analysis={"source": VAULT_SOURCE},
+            submission=dict(CHALLENGER_SUBMISSION_FALSIFIED),
+            credential=_challenger_credential(dispatcher),
         )
         assert verdict["verdict"] == "falsified"
     finally:
@@ -129,7 +138,7 @@ def test_wsl_false_positive_gate_a(tmp_path: Path) -> None:
 
 
 def test_wsl_true_defect_through_finding(tmp_path: Path) -> None:
-    server, sock, token, store = _start(tmp_path)
+    server, sock, token, store, dispatcher = _start(tmp_path)
     try:
         hyp = seed_hypothesis(
             store,
@@ -148,7 +157,8 @@ def test_wsl_true_defect_through_finding(tmp_path: Path) -> None:
         a = client.call(
             "evidence.gate_a",
             hypothesis_id=hyp["hypothesis_id"],
-            analysis={"source": REENTRANT_SOURCE},
+            submission=dict(CHALLENGER_SUBMISSION_POC_WORTHY),
+            credential=_challenger_credential(dispatcher),
         )
         assert a["verdict"] == "poc_worthy"
         try:
@@ -224,7 +234,7 @@ def test_wsl_true_defect_through_finding(tmp_path: Path) -> None:
 
 
 def test_wsl_duplicate_linked_without_deletion(tmp_path: Path) -> None:
-    server, sock, token, store = _start(tmp_path)
+    server, sock, token, store, _dispatcher = _start(tmp_path)
     try:
         first = seed_hypothesis(
             store,

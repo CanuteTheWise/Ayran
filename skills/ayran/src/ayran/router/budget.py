@@ -10,12 +10,10 @@ from ayran.hypotheses.drivers.base import DRIVER_NAMES, DRIVER_ORIGINS
 
 TRANCHE = 100
 FLOORS = {
-    "model_native": 25,
     "global_graph": 15,
     "contradiction": 15,
     "tool_derived": 10,
     "coverage_derived": 15,
-    "adversarial_specialist": 20,
 }
 CEILINGS = dict(FLOORS)
 
@@ -25,7 +23,9 @@ class BudgetManager:
     tranche: int = TRANCHE
     spent_total: int = 0
     spent: dict[str, int] = field(default_factory=dict)
-    reserved_model_native: int = FLOORS["model_native"]
+    # The 25-unit model reserve survives the model_native driver deletion: it
+    # now protects the model_novel authorship lane (remember()) until R3 lands.
+    reserved_model_native: int = ORIGIN_BUDGET["model_novel"]
     reserve_released: bool = False
     exhaustion_mode: str = "manual_next"  # or halt
 

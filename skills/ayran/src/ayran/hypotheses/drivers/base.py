@@ -9,21 +9,17 @@ from ayran.context.view import GraphView
 from ayran.hypotheses.builders import ORIGIN_BUDGET
 
 DRIVER_NAMES = (
-    "model_native",
     "global_graph",
     "contradiction",
     "tool_derived",
     "coverage_derived",
-    "adversarial_specialist",
 )
 
 DRIVER_ORIGINS = {
-    "model_native": "model_novel",
     "global_graph": "global_graph",
     "contradiction": "contradiction",
     "tool_derived": "tool",
     "coverage_derived": "coverage",
-    "adversarial_specialist": "specialist",
 }
 
 

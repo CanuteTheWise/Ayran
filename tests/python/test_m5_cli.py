@@ -63,7 +63,7 @@ def test_cli_context_compile_and_router_status(tmp_path: Path) -> None:
         ]
     )
     assert code == 0
-    assert "model_native" in status
+    assert "coverage_derived" in status
     assert "budget" in status
     code, maps = _invoke(
         [
@@ -105,10 +105,10 @@ def test_router_step_persists_target_first_and_budget(tmp_path: Path) -> None:
         )
         persist_graph_objects(store, built["nodes"], built["edges"])
         first = router_step(store, cluster_id=CLUSTER, persist=True)
-        assert first["origins"].get("model_native") == "model_novel"
+        assert first["origins"].get("coverage_derived") == "coverage"
         status = router_status(store, cluster_id=CLUSTER)
-        assert status["budget"]["spent"]["model_native"] > 0
-        assert CLUSTER in status.get("driver_states", {}) or status["budget"]["spent"]["model_native"]
+        assert status["budget"]["spent"]["coverage_derived"] > 0
+        assert CLUSTER in status.get("driver_states", {}) or status["budget"]["spent"]["coverage_derived"]
         second = router_step(store, cluster_id=CLUSTER, persist=True)
         # After the target-first pass is recorded, later cycles may include global_graph.
         _ = second
