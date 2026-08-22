@@ -140,7 +140,8 @@ def _persist_writer_strike(
     strike_id = content_id("nod", "writer-strike", key)
     persist_runtime_node(
         store,
-        evidence_node(
+        _evidence_node(
+            store,
             node_type="PayloadStrike",
             node_id=strike_id,
             run_id=run_id,
@@ -154,7 +155,8 @@ def _persist_writer_strike(
         quarantine_id = content_id("nod", "writer-quarantine", key)
         persist_runtime_node(
             store,
-            evidence_node(
+            _evidence_node(
+                store,
                 node_type="Quarantine",
                 node_id=quarantine_id,
                 run_id=run_id,
@@ -215,6 +217,51 @@ def _view_dict(store: GraphStore, cluster_id: str | None = None) -> dict[str, An
         "run_id": view.run_id,
         "target_identity": view.target_identity,
     }
+
+
+def _engagement_identity(store: GraphStore) -> dict[str, Any] | None:
+    """Engagement identity from ``store.stream`` only — never from a client payload.
+
+    Writer identity stays channel-derived (spec 11.4). This helper threads the
+    engagement *context* identity. A missing or blank stream identity returns
+    None so builders keep today's default stamp (C8 byte-stable path).
+    """
+
+    raw = store.stream.get("target_identity")
+    identity = dict(raw) if isinstance(raw, dict) else None
+    if identity is None or not str(identity.get("target_id") or "").strip():
+        return None
+    return identity
+
+
+def _stamp_engagement_identity(store: GraphStore, value: dict[str, Any]) -> dict[str, Any]:
+    identity = _engagement_identity(store)
+    if identity is None or "target_identity" not in value:
+        return value
+    stamped = dict(value)
+    stamped["target_identity"] = identity
+    return stamped
+
+
+def _evidence_node(store: GraphStore, **kwargs: Any) -> dict[str, Any]:
+    """Build a graph-node whose typed properties carry stream identity.
+
+    ``graph_node`` / ``evidence_node`` have no top-level ``target_identity``
+    field (graph-node schema is additionalProperties: false). Journal context
+    checks that field only when present, so graph-nodes never fail F4 by
+    themselves; properties let inspectors see the engagement ids on PocRun
+    and record nodes without changing the schema shape.
+    """
+
+    identity = _engagement_identity(store)
+    properties = dict(kwargs.get("properties") or {})
+    if identity is not None:
+        for key in ("target_id", "scope_id", "source_tree_hash", "commit"):
+            value = identity.get(key)
+            if key not in properties and value is not None:
+                properties[key] = value
+        kwargs = {**kwargs, "properties": properties}
+    return evidence_node(**kwargs)
 
 
 def _require_hypothesis(store: GraphStore, hypothesis_id: str) -> dict[str, Any]:
@@ -512,7 +559,7 @@ def remember(
         root_cause="",
         state=cluster,
         attacker="unprivileged",
-        target_identity=None,
+        target_identity=_engagement_identity(store),
     )
     # Server-side dedup pre-insert via hypotheses.dedup.hypothesis_key (§5.1).
     dedup_key = hypothesis_key({key: value for key, value in candidate.items() if key != "_triple"})
@@ -693,7 +740,9 @@ def gate_a(
         "id": str(record["reviewer"].get("id") or "ayran.gate_a"),
         "version": "1.0.0",
     }
-    persist_contract(store, "da-verdict", record, actor=reviewer_actor, event_stem="da_verdict")
+    persist_contract(
+        store, "da-verdict", _stamp_engagement_identity(store, record), actor=reviewer_actor, event_stem="da_verdict"
+    )
     # Revoked at the verdict seal: the credential granted exactly one submission.
     if presented is not None and credentials is not None:
         credentials.consume(presented)
@@ -811,14 +860,21 @@ def gate_b(
     if isinstance(record, dict):
         projection_record = result.get("projection_record")
         summary = projection_record if isinstance(projection_record, dict) else record
-        persist_contract(store, "da-verdict", summary, actor=ACTOR_GATE_B, event_stem="da_verdict")
+        persist_contract(
+            store,
+            "da-verdict",
+            _stamp_engagement_identity(store, summary),
+            actor=ACTOR_GATE_B,
+            event_stem="da_verdict",
+        )
         result["verdict_id"] = str(summary["verdict_id"])
         if str(record.get("schema_version") or "") == "2.0.0":
             # The v2 record is journaled verbatim as a sealed graph node: the
             # canonical da-verdict schema catalog stays untouched (historical
             # 1.0.0 records remain readable; forward-only, no rewrites).
             stamp = str(hypothesis.get("created_at") or "")
-            node = evidence_node(
+            node = _evidence_node(
+                store,
                 node_type="GateBExecutionRecord",
                 node_id=content_id("nod", "gate-b-execution", str(summary["verdict_id"])),
                 run_id=str(hypothesis.get("run_id") or ""),
@@ -865,7 +921,8 @@ def dedup_check(store: GraphStore, hypothesis_id: str, *, persist: bool = True) 
     result = check_duplicates(hypothesis, others)
     if persist:
         stamp = str(hypothesis.get("created_at") or "")
-        node = evidence_node(
+        node = _evidence_node(
+            store,
             node_type="DedupCluster",
             node_id=str(result["cluster_id"]),
             run_id=str(hypothesis.get("run_id") or ""),
@@ -918,7 +975,8 @@ def impact_assess(
     hypothesis = _require_hypothesis(store, hypothesis_id)
     record = assess_impact(hypothesis, assumptions=assumptions)
     stamp = str(hypothesis.get("created_at") or "")
-    node = evidence_node(
+    node = _evidence_node(
+        store,
         node_type="ImpactRecord",
         node_id=str(record["impact_id"]),
         run_id=str(hypothesis.get("run_id") or ""),
@@ -954,7 +1012,8 @@ def severity_assess(
         used_impact, policy_id=policy_id, preconditions_unprivileged=unprivileged
     )
     stamp = str(hypothesis.get("created_at") or "")
-    node = evidence_node(
+    node = _evidence_node(
+        store,
         node_type="SeverityRecord",
         node_id=content_id("sev", hypothesis_id, record["label"], record["policy_id"]),
         run_id=str(hypothesis.get("run_id") or ""),
@@ -993,7 +1052,8 @@ def poc_run(
             "PoC not executed; pass recorded= or experiment.execute=true to dispatch Foundry"
         )
     stamp = str(hypothesis.get("created_at") or "")
-    node = evidence_node(
+    node = _evidence_node(
+        store,
         node_type="PocRun",
         node_id=str(result["poc_id"]),
         run_id=str(hypothesis.get("run_id") or ""),
@@ -1045,7 +1105,8 @@ def poc_replay(store: GraphStore, poc_id: str, *, recorded: dict[str, Any] | Non
         raise EvidenceError(POC_NOT_FOUND, f"poc {poc_id} was not found")
     result = replay_recorded(original, recorded)
     stamp = str((node_raw or {}).get("created_at") or "")
-    node = evidence_node(
+    node = _evidence_node(
+        store,
         node_type="PocRun",
         node_id=poc_id,
         run_id=str((node_raw or {}).get("run_id") or ""),
@@ -1122,7 +1183,9 @@ def finding_build(store: GraphStore, hypothesis_id: str) -> dict[str, Any]:
     persist_contract(
         store,
         "finding",
-        {key: value for key, value in finding.items() if not str(key).startswith("_")},
+        _stamp_engagement_identity(
+            store, {key: value for key, value in finding.items() if not str(key).startswith("_")}
+        ),
         actor=ACTOR_FINDING,
         event_stem="finding",
     )
