@@ -70,24 +70,45 @@ def _denied(result: Any) -> bool:
     return isinstance(result, dict) and result.get("accepted") is False and "error" in result
 
 
-def map_target(force: bool = False) -> dict[str, Any]:
-    """Build/refresh the attack-surface map and compile the enriched pack.
+def map_target(force: bool = False, source_text: str | None = None) -> dict[str, Any]:
+    """Build/refresh attack-surface, value-flow, and data-flow maps, then compile.
 
     Chain: ``maps.build`` (attack_surface; seeds the coverage grid) ->
-    ``coverage.summary`` (census M/N + unexamined) -> ``context.compile``.
-    ``force`` is forwarded for operator-forced rebuilds; today ``maps.build``
-    always rebuilds (no cache), so the flag is reserved for cache semantics.
+    ``maps.build`` (value_flow; money-map signal) -> ``maps.build``
+    (data_flow; WRITES edges for coupled pairs) -> ``coverage.summary``
+    (census M/N + unexamined) -> ``context.compile``. ``force`` is forwarded
+    to the attack-surface build; today ``maps.build`` always rebuilds (no
+    cache), so the flag is reserved for cache semantics. Optional
+    ``source_text`` is forwarded to each ``maps.build`` so in-process
+    fixtures can supply Solidity; live runs may omit it (source then
+    arrives via other ``maps.build`` callers).
     """
 
     client = _connect()
-    maps = client.call("maps.build", map_type="attack_surface", persist=True, force=bool(force))
-    if _denied(maps):
-        return maps  # type: ignore[no-any-return]
+    extra: dict[str, Any] = {}
+    if source_text is not None:
+        extra["source_text"] = source_text
+    attack = client.call(
+        "maps.build", map_type="attack_surface", persist=True, force=bool(force), **extra
+    )
+    if _denied(attack):
+        return attack  # type: ignore[no-any-return]
+    value = client.call("maps.build", map_type="value_flow", persist=True, **extra)
+    if _denied(value):
+        return value  # type: ignore[no-any-return]
+    data = client.call("maps.build", map_type="data_flow", persist=True, **extra)
+    if _denied(data):
+        return data  # type: ignore[no-any-return]
     census = client.call("coverage.summary")
     pack = client.call(
         "context.compile", token_budget=4000, purpose="map_target", role="root-auditor"
     )
-    return {"schema_version": "1.0.0", "maps": maps, "coverage": census, "pack": pack}
+    return {
+        "schema_version": "1.0.0",
+        "maps": {"attack_surface": attack, "value_flow": value, "data_flow": data},
+        "coverage": census,
+        "pack": pack,
+    }
 
 
 def scan(adapter: str, input: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:

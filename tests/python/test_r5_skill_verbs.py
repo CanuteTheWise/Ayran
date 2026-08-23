@@ -107,10 +107,12 @@ def test_full_engagement_through_catalog_verbs(engagement: Any, tmp_path: Path) 
 
     dispatcher = engagement
 
-    # 1. map_target: maps.build -> coverage.summary -> context.compile.
+    # 1. map_target: maps.build x3 -> coverage.summary -> context.compile.
     mapped = verbs.map_target()
     assert mapped["schema_version"] == "1.0.0"
-    assert mapped["maps"]["map_type"] == "attack_surface"
+    assert mapped["maps"]["attack_surface"]["map_type"] == "attack_surface"
+    assert mapped["maps"]["value_flow"]["map_type"] == "value_flow"
+    assert mapped["maps"]["data_flow"]["map_type"] == "data_flow"
     assert mapped["coverage"]["schema_version"] == "1.0.0"
     assert mapped["pack"]["content_hash"].startswith("sha256:")
 

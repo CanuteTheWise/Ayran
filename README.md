@@ -51,7 +51,7 @@ The model's working interface is ten verbs in `ayran.skill.verbs`, 1:1 with side
 
 | Verb | Signature | Purpose | RPC | Returns |
 |------|-----------|---------|-----|---------|
-| `map_target` | `map_target(force: bool = False)` | Build/refresh the attack-surface map and compile the enriched pack. | `maps.build` → `coverage.summary` → `context.compile` | `{schema_version, maps, coverage, pack}` or a denial |
+| `map_target` | `map_target(force: bool = False, source_text: str \| None = None)` | Build/refresh attack-surface, value-flow, and data-flow maps and compile the enriched pack. Money-map and coupled-pair sections are deterministic heuristics over source text — leads with documented false-positive traps, not compiler-grade data flow. | `maps.build(attack_surface)` → `maps.build(value_flow)` → `maps.build(data_flow)` → `coverage.summary` → `context.compile` | `{schema_version, maps, coverage, pack}` or a denial |
 | `scan` | `scan(adapter, input, timeout=None)` | Run one registered adapter supervised. Findings are leads. | `tools.run` | adapter result (ceiling `lead`) |
 | `search_precedents` | `search_precedents(query, filters=None, limit=None)` | Ground hypotheses in **ingested** corpus only. Live Solodit POST remains operator-sanctioned-only. | `knowledge.query` | `{records, count, ...}` (limit trims records) |
 | `remember` | `remember(*, origin, claim, attack_path, preconditions, cluster_id=None, **rest)` | Author a hypothesis. The only model→graph write path for reasoning content; writer identity is bound server-side. | `hypotheses.remember` | `{accepted, hypothesis_id, writer, ...}` |
