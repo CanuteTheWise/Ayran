@@ -1404,6 +1404,25 @@ class BridgeDispatcher:
             learning_root = (
                 Path(str(params["learning_root"])) if params.get("learning_root") else None
             )
+            if params.get("live") or params.get("preregistration"):
+                from ayran.evaluation.service import run_live
+
+                if not results_root:
+                    raise EvaluationError("EVALUATION_INVALID", "live eval.run requires results_root")
+                prereg = params.get("preregistration")
+                targets = params.get("targets")
+                if not prereg:
+                    from ayran.evaluation.errors import PREREGISTRATION_REQUIRED
+
+                    raise EvaluationError(PREREGISTRATION_REQUIRED, "live eval.run requires preregistration")
+                if not targets:
+                    raise EvaluationError("EVALUATION_INVALID", "live eval.run requires targets")
+                return run_live(
+                    preregistration=Path(str(prereg)),
+                    targets=Path(str(targets)),
+                    results_root=results_root,
+                    seed=seed,
+                )
             if arm:
                 return run_arm(
                     str(arm),

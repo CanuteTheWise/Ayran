@@ -61,8 +61,8 @@ def test_full_session_gate_and_comparisons(tmp_path: Path) -> None:
     assert manifest.gate.improved_over_a0 is True
     assert manifest.gate.release_ready is True
     assert manifest.model_invoked is False
-    assert "external_hound" in manifest.comparisons
     assert "target_only" in manifest.comparisons
+    assert "external_hound" not in manifest.comparisons
     assert manifest.leakage["clean"] is True
     assert manifest.adjudication
     assert manifest.agreement

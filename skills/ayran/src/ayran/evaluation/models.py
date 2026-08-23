@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 ArmId = Literal["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"]
 PartitionName = Literal["train", "development", "test"]
 ComparisonId = Literal[
-    "external_hound",
     "target_only",
     "target_global",
     "target_global_learning",
@@ -56,30 +55,56 @@ class ArmSpec(_Strict):
 
 
 class PrimaryMetrics(_Strict):
-    severity_weighted_recall: float
-    precision: float
-    false_positive_rate: float
-    executable_poc_rate: float
-    defect_pinning_rate: float
-    time_to_first_valid_finding_s: float
-    cost_per_validated_finding: float
-    reproducibility: float
+    severity_weighted_recall: float | None = None
+    precision: float | None = None
+    false_positive_rate: float | None = None
+    executable_poc_rate: float | None = None
+    defect_pinning_rate: float | None = None
+    time_to_first_valid_finding_s: float | None = None
+    cost_per_validated_finding: float | None = None
+    reproducibility: float | None = None
 
 
 class SecondaryMetrics(_Strict):
-    duplicate_rate: float = 0.0
-    coverage: float = 0.0
-    tool_selection_accuracy: float = 0.0
-    retrieval_usefulness: float = 0.0
-    anchoring_resistance: float = 0.0
-    gate_rejection_accuracy: float = 0.0
-    resume_recovery_quality: float = 0.0
-    operator_interventions: int = 0
-    cost: float = 0.0
-    scope_violations: int = 0
-    unsafe_actions: int = 0
-    novel_valid_findings: int = 0
-    hypothesis_source_diversity: float = 0.0
+    duplicate_rate: float | None = None
+    coverage: float | None = None
+    tool_selection_accuracy: float | None = None
+    retrieval_usefulness: float | None = None
+    anchoring_resistance: float | None = None
+    gate_rejection_accuracy: float | None = None
+    resume_recovery_quality: float | None = None
+    operator_interventions: int | None = None
+    cost: float | None = None
+    scope_violations: int | None = None
+    unsafe_actions: int | None = None
+    novel_valid_findings: int | None = None
+    hypothesis_source_diversity: float | None = None
+
+
+class ObservedFinding(_Strict):
+    family: str
+    valid: bool = True
+    first_seen_s: float | None = None
+    poc_ok: bool | None = None
+    pinned: bool | None = None
+    truth_id: str = ""
+
+
+class ObservedRun(_Strict):
+    findings: list[ObservedFinding] = Field(default_factory=list)
+    false_positives: list[str] = Field(default_factory=list)
+    started_at: str | None = None
+    ended_at: str | None = None
+    cost_usd: float | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    rate_source: str | None = None
+    coverage: float | None = None
+    operator_interventions: int | None = None
+    scope_violations: int | None = None
+    unsafe_actions: int | None = None
+    exit_status: str = "ok"
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ArmRun(_Strict):
@@ -96,6 +121,12 @@ class ArmRun(_Strict):
     corpus_hash: str = ""
     tool_hash: str = ""
     result_hash: str = ""
+    target_id: str = ""
+    started_at: str = ""
+    ended_at: str = ""
+    exit_status: str = "ok"
+    usage: dict[str, Any] = Field(default_factory=dict)
+    null_metrics: list[str] = Field(default_factory=list)
 
 
 class AdjudicationForm(_Strict):
@@ -147,3 +178,7 @@ class EvaluationManifest(_Strict):
     tool_hash: str = ""
     failures_included: bool = True
     content_hash: str = ""
+    status: str = "completed"
+    null_metric_disclosures: list[str] = Field(default_factory=list)
+    preregistration_hash: str = ""
+    cost_ledger: list[dict[str, Any]] = Field(default_factory=list)

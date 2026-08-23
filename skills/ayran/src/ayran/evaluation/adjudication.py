@@ -22,13 +22,18 @@ RUBRIC_AXES = (
 
 def _scores_from_run(run: ArmRun) -> dict[str, float]:
     primary = run.metrics
-    return {
-        "severity_weighted_recall": primary.severity_weighted_recall,
-        "precision": primary.precision,
-        "false_positive_rate": 1.0 - primary.false_positive_rate,
-        "executable_poc_rate": primary.executable_poc_rate,
-        "defect_pinning_rate": primary.defect_pinning_rate,
-    }
+    scores: dict[str, float] = {}
+    if primary.severity_weighted_recall is not None:
+        scores["severity_weighted_recall"] = primary.severity_weighted_recall
+    if primary.precision is not None:
+        scores["precision"] = primary.precision
+    if primary.false_positive_rate is not None:
+        scores["false_positive_rate"] = 1.0 - primary.false_positive_rate
+    if primary.executable_poc_rate is not None:
+        scores["executable_poc_rate"] = primary.executable_poc_rate
+    if primary.defect_pinning_rate is not None:
+        scores["defect_pinning_rate"] = primary.defect_pinning_rate
+    return scores
 
 
 def adjudicate_arm(

@@ -377,6 +377,16 @@ def _parser() -> argparse.ArgumentParser:
     eval_run.add_argument("--evals", type=Path)
     eval_run.add_argument("--knowledge-root", type=Path)
     eval_run.add_argument("--learning-root", type=Path)
+    eval_run.add_argument("--live", action="store_true", help="run the live harness (scripted transport in CI)")
+    eval_run.add_argument("--preregistration", type=Path)
+    eval_run.add_argument("--targets", type=Path)
+    eval_prereg = eval_sub.add_parser("preregister", help="journal an owner-signed live-eval preregistration")
+    _add_config(eval_prereg)
+    eval_prereg.add_argument("--manifest", type=Path, required=True)
+    eval_prereg.add_argument("--results-root", type=Path)
+    eval_pause = eval_sub.add_parser("pause", help="set the eval kill switch (honored between launches)")
+    _add_config(eval_pause)
+    eval_pause.add_argument("--results-root", type=Path, required=True)
     eval_adj = eval_sub.add_parser("adjudicate", help="adjudicate a completed evaluation session")
     _add_config(eval_adj)
     eval_adj.add_argument("--session", required=True)
@@ -944,11 +954,42 @@ def _command_learning(arguments: argparse.Namespace) -> dict[str, Any]:
 
 
 def _command_eval(arguments: argparse.Namespace) -> dict[str, Any]:
-    from ayran.evaluation.service import adjudicate, results, run_all, run_arm
+    from ayran.evaluation.service import (
+        adjudicate,
+        pause_eval,
+        preregister_eval,
+        results,
+        run_all,
+        run_arm,
+        run_live,
+    )
 
     command = arguments.eval_command
     results_root = getattr(arguments, "results_root", None)
+    if command == "preregister":
+        if results_root is None:
+            raise ValueError("eval preregister requires --results-root")
+        return preregister_eval(arguments.manifest, results_root=results_root)
+    if command == "pause":
+        if results_root is None:
+            raise ValueError("eval pause requires --results-root")
+        return pause_eval(results_root=results_root)
     if command == "run":
+        if getattr(arguments, "live", False) or getattr(arguments, "preregistration", None):
+            if results_root is None:
+                raise ValueError("live eval run requires --results-root")
+            if getattr(arguments, "preregistration", None) is None:
+                from ayran.evaluation.errors import PREREGISTRATION_REQUIRED, EvaluationError
+
+                raise EvaluationError(PREREGISTRATION_REQUIRED, "live eval run requires --preregistration")
+            if getattr(arguments, "targets", None) is None:
+                raise ValueError("live eval run requires --targets")
+            return run_live(
+                preregistration=arguments.preregistration,
+                targets=arguments.targets,
+                results_root=results_root,
+                seed=getattr(arguments, "seed", None),
+            )
         arm = getattr(arguments, "arm", None)
         kwargs = {
             "seed": getattr(arguments, "seed", None),

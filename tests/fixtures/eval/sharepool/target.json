@@ -1,0 +1,13 @@
+{
+  "target_id": "sharepool-inflation",
+  "workspace_path": ".",
+  "ground_truth": [
+    {
+      "root_cause_family": "share-inflation",
+      "severity": 6.0,
+      "notes": "first depositor can donate tokens to inflate share price and steal later deposits"
+    }
+  ],
+  "revision_or_commit": "fixture-r6-v1",
+  "held_out": true
+}

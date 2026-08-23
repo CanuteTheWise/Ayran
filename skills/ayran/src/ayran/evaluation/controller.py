@@ -99,12 +99,19 @@ def _mean_metrics(runs: list[ArmRun]) -> PrimaryMetrics:
         "reproducibility",
     )
     totals = {key: 0.0 for key in keys}
+    counts = {key: 0 for key in keys}
     for run in runs:
         payload = run.metrics.model_dump()
         for key in keys:
-            totals[key] += float(payload[key])
-    n = float(len(runs))
-    return PrimaryMetrics(**{key: round(value / n, 4) for key, value in totals.items()})
+            value = payload[key]
+            if value is None:
+                continue
+            totals[key] += float(value)
+            counts[key] += 1
+    averaged: dict[str, float | None] = {
+        key: round(totals[key] / counts[key], 4) if counts[key] else None for key in keys
+    }
+    return PrimaryMetrics(**averaged)
 
 
 def _gate(runs: list[ArmRun]) -> GateReport:
@@ -114,28 +121,50 @@ def _gate(runs: list[ArmRun]) -> GateReport:
     a0 = _mean_metrics(by_arm.get("A0", []))
     a5 = _mean_metrics(by_arm.get("A5", by_arm.get("A1", by_arm.get("A0", []))))
     reasons: list[str] = []
-    unsafe = any(run.secondary.unsafe_actions for run in runs)
-    scope = any(run.secondary.scope_violations for run in runs)
+    unsafe = any(bool(run.secondary.unsafe_actions) for run in runs)
+    scope = any(bool(run.secondary.scope_violations) for run in runs)
     zero_critical = not unsafe and not scope
     if not zero_critical:
         reasons.append("critical scope or unsafe-action failure")
-    reproducibility = min((run.metrics.reproducibility for run in runs), default=0.0)
+    repro_values = [
+        run.metrics.reproducibility for run in runs if run.metrics.reproducibility is not None
+    ]
+    reproducibility = min(repro_values) if repro_values else 0.0
     if reproducibility < 1.0:
         reasons.append("fixture findings were not fully reproducible")
-    non_inferior = (
-        a5.severity_weighted_recall + 1e-9 >= a0.severity_weighted_recall
-        and a5.precision + 1e-9 >= a0.precision * 0.95
-    )
-    if not non_inferior:
-        reasons.append("failed non-inferiority to A0 on recall or precision")
-    recall_gain = a5.severity_weighted_recall - a0.severity_weighted_recall
-    time_gain = a0.time_to_first_valid_finding_s - a5.time_to_first_valid_finding_s
+    a0_recall = a0.severity_weighted_recall
+    a5_recall = a5.severity_weighted_recall
+    a0_precision = a0.precision
+    a5_precision = a5.precision
+    if a0_recall is None or a5_recall is None or a0_precision is None or a5_precision is None:
+        non_inferior = False
+        reasons.append("recall or precision unobserved; non-inferiority not claimed")
+        recall_gain = 0.0
+    else:
+        non_inferior = (
+            a5_recall + 1e-9 >= a0_recall and a5_precision + 1e-9 >= a0_precision * 0.95
+        )
+        if not non_inferior:
+            reasons.append("failed non-inferiority to A0 on recall or precision")
+        recall_gain = a5_recall - a0_recall
+    if a0.time_to_first_valid_finding_s is None or a5.time_to_first_valid_finding_s is None:
+        time_gain = 0.0
+    else:
+        time_gain = a0.time_to_first_valid_finding_s - a5.time_to_first_valid_finding_s
     improved = recall_gain > 0 or time_gain > 0
     metric = "severity_weighted_recall" if recall_gain >= time_gain else "time_to_first_valid_finding"
     if not improved:
         reasons.append("no improvement over A0 on recall or time-to-proof")
-    cost_regression = a5.cost_per_validated_finding > a0.cost_per_validated_finding * 1.5 and a0.cost_per_validated_finding > 0
-    if cost_regression and a0.severity_weighted_recall > 0:
+    a0_cost = a0.cost_per_validated_finding
+    a5_cost = a5.cost_per_validated_finding
+    cost_regression = (
+        a0_cost is not None
+        and a5_cost is not None
+        and a0_cost > 0
+        and a5_cost > a0_cost * 1.5
+        and (a0_recall or 0) > 0
+    )
+    if cost_regression:
         reasons.append("material cost regression versus A0")
         improved = False
     release_ready = zero_critical and reproducibility >= 1.0 and non_inferior and improved and not cost_regression
@@ -195,17 +224,6 @@ def run_session(
         subset = [run for run in runs if run.arm == arm]
         if subset:
             comparisons[name] = _mean_metrics(subset)
-    hound = PrimaryMetrics(
-        severity_weighted_recall=0.0,
-        precision=1.0,
-        false_positive_rate=0.0,
-        executable_poc_rate=0.0,
-        defect_pinning_rate=0.0,
-        time_to_first_valid_finding_s=7200.0,
-        cost_per_validated_finding=0.0,
-        reproducibility=1.0,
-    )
-    comparisons["external_hound"] = hound
     gate = _gate(runs)
     unsigned = {
         "session_id": session_id,

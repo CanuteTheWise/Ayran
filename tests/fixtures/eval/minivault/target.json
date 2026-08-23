@@ -1,0 +1,13 @@
+{
+  "target_id": "minivault-reentrancy",
+  "workspace_path": ".",
+  "ground_truth": [
+    {
+      "root_cause_family": "reentrancy",
+      "severity": 9.0,
+      "notes": "withdraw sends ETH then zeros the balance (CEI inverted)"
+    }
+  ],
+  "revision_or_commit": "fixture-r6-v1",
+  "held_out": true
+}
