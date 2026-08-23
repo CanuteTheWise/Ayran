@@ -6,7 +6,7 @@
 
 Ayran is a private, local-first autonomous smart-contract security audit harness. It wraps the Prime-Agent CLI with a structured evidence pipeline that turns a configured AI model into a disciplined auditor — one that maps attack surfaces, proposes hypotheses, executes tools to prove or disprove them, enforces validation gates, retains what it learns between audits, and produces defensible reports where every claim resolves to recorded evidence.
 
-The current release is **0.1.6**. It covers milestones M0 through M9 plus a one-command `--ayran` session (auto-bound scope, **project-pinned Target Graph**, injection after `/ayran:activate`). It targets Solidity/EVM contracts on WSL2, runs entirely offline, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
+The current release is **0.1.6**, now carrying the full Phase-B rebuild on `main`: milestones M0–M9, then R0 truth repair, R1 cognitive inversion, R2 mechanical Gate B, R3 specialists & lenses, R4 corpus ingestion, R5 seamless surface, C3 map enrichment, and R6's live comparative evaluation (not yet re-versioned or tagged). It targets Solidity/EVM contracts on WSL2, runs entirely offline by default, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
 
 ### How to understand Ayran
 
@@ -197,7 +197,7 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 **Trail of Bits Skills** — audit context, multi-language entry points, false-positive review, property testing, differential/variant analysis patterns. Shaped the Gate A/B test design and M6 dedup rules.
 
-**DeFiHackLabs** — pinned incident/PoC corpus, catalogued for future ingestion. No DeFiHackLabs incident cards exist in the Global Graph today and no evaluation fixture derives from it; ingestion is planned work, not current capability. Retrieved code is never executed.
+**DeFiHackLabs** — the R4 ingestion pipeline converts pinned `src/test/<YYYY-MM>/<Protocol>_exp.sol` header cards into typed incident cards with verbatim numeric assertions and contamination groups; registry audit and sanitization stages (blacklist hook, artifact scan, hostile-hash blocklist) guard it. Ingestion runs offline against caller-supplied pinned directories (`knowledge ingest-defihacklabs`); no live upstream fetch has happened yet, so Global Graph cards from real upstream bytes remain pending work. Retrieved code is never executed.
 
 **Shuvon Skills** — unique vulnerability triage and grep-location concepts ingested with dedup/version predicates. Grep is a locator, not semantic proof.
 
@@ -346,6 +346,9 @@ ayran knowledge status                  # current corpus release, record counts
 ayran knowledge query --type <type>     # query knowledge records
 ayran knowledge release --version <v>   # construct a corpus release
 ayran knowledge tombstone <id> --reason # tombstone a source
+ayran knowledge ingest-defihacklabs <dir> --archive-sha256 <h>  # pinned DeFiHackLabs ingest (R4)
+ayran knowledge ingest-krait <dir>      # Krait deep-ingest (845-check snapshots)
+ayran knowledge audit-registry          # registry integrity + fabrication audit
 
 # Learning
 ayran learning capture --run <id>       # capture outcome for learning
@@ -361,9 +364,12 @@ ayran coverage cell <cell_id>           # detailed cell state and evidence
 ayran maps <type>                       # print a map (attack_surface, control_flow, etc.)
 
 # Evaluation and release
-ayran eval run --arm <A0..A7> --seed <n>  # run sealed evaluation
-ayran eval adjudicate --session <id>    # adjudicate results
-ayran eval results --session <id>       # show results manifest
+ayran eval preregister --manifest <sheet.json> --results-root <dir>  # sign the grading sheet before live runs
+ayran eval run --arm <A0..A7> --seed <n>   # run sealed evaluation
+ayran eval run --live --preregistration <sheet> --targets <dir> --results-root <dir>  # live comparative session
+ayran eval pause --results-root <dir>      # kill switch (honored between launches)
+ayran eval adjudicate --session <id>       # adjudicate results
+ayran eval results --session <id>          # show results manifest
 ayran release build --layer             # build Layer bundle
 ayran release build --complete          # build Complete bundle
 ayran release validate --path <bundle>  # validate a release bundle
@@ -433,9 +439,9 @@ The following are evidence-based recommendations to make Ayran more effective fo
 
 ### 7. Run live-model A0 through A7 against multiple project families
 
-**Why:** Everything currently was validated against offline fixtures. The entire point of the A0–A7 sequence is to answer whether each added mechanism improves real audit outcomes. You don't know until you run it with live models on real (or realistic) targets.
+**Status: first live comparative session executed (R6, 2026-08-23)** — A0 vs full-Ayran on five held-out single-defect fixtures, preregistered sheet bound before launch, kill switch and caps active. Outcome: both arms adjudicated at recall 1.0 (ceiling — no lift measurable at that difficulty), transport-blind scoring disclosed, machine gate honestly kept at `release_ready: false`. Record: `docs/evaluation/r6-session-evs_163P3NAAQ7EQQ3K7SWN1J3XXHY/`. What remains for a *discriminative* result: harder multi-defect targets, a seeing-eye scorer (structured finding events or integrated post-hoc grading), multiple seeds/project families.
 
-**What to do:** Define a corpus of at least 3 project families (e.g., DeFi AMM, lending protocol, governance/vault). Run the full A0–A7 with a consistent model and consistent budget. Track the primary metrics from section 20.2, especially severity-weighted recall of unique validated root causes and reproducibility. Publish the full result manifest including failures — do not exclude underperforming arms.
+**Why:** Everything else was validated against offline fixtures. The entire point of the arm sequence is to answer whether each added mechanism improves real audit outcomes.
 
 **Risk:** Expensive (API costs). Budget accordingly. Run smaller pilot first.
 
@@ -467,7 +473,7 @@ Ayran enforces policy; it does not sandbox execution. Critical truths about the 
 - Ayran cannot autonomously submit findings to external platforms
 - Every install step works offline
 
-The extension's `ipython` tool-blocking is best-effort and is NOT a security boundary. The real boundary is policy at the sidecar layer plus external OS sandboxing (WSL/container isolation). Do not run untrusted Ayran targets outside an isolated VM.
+The real boundary is policy at the sidecar layer (deny-wins scope ACL, per-identity verb ACLs, single-writer state) plus external OS sandboxing (WSL/container isolation). There is no payload string-sniffing: enforcement is structural. Do not run untrusted Ayran targets outside an isolated VM.
 
 ---
 
@@ -501,4 +507,4 @@ The extension's `ipython` tool-blocking is best-effort and is NOT a security bou
 
 Ayran 0.1.6 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
 
-This is version 0.1.6. It is not a certified release. Live-model A0–A7 evaluation with real model provider API calls has not been executed. The `createAgentSession` SDK interface requires a live Prime runtime for full validation.
+This is version 0.1.6 carrying the Phase-B rebuild (R0–R6 + C3) on `main`. It is not a certified release and has no public license yet. A live comparative evaluation (A0 vs full-Ayran, five held-out targets, preregistered sheet) was executed on 2026-08-23 under operator-delegated authority: pipeline proven end-to-end, non-inferiority at ceiling, lift not demonstrated — see `docs/evaluation/r6-session-evs_163P3NAAQ7EQQ3K7SWN1J3XXHY/ADJUDICATION.md` for the full honest record.

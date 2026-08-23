@@ -10,7 +10,28 @@ Deny wins. Scope manifests name allowed roots, actions, hosts, tools, and write 
 
 ## Sandboxing notes
 
-IPython payload blocking is best-effort and is not OS sandboxing. Destructive actions, broadcasts, submissions, and installers stay human-gated. Experimental adapters stay disabled unless an operator enables them.
+Destructive actions, broadcasts, submissions, and installers stay human-gated.
+Experimental adapters stay disabled unless an operator enables them. Tool invocation
+is argv-only (`shell: false`) with environment allowlisting; the target is copied to
+a scratch directory before any test run.
+
+## Model credentials (R5)
+
+Session keys are generated in the Prime extension (TypeScript — outside
+model-reachable Python) and enrolled once into the sidecar via the
+`credentials.enroll` RPC; until enrollment, credential-dependent methods fail closed.
+Per-spawn challenger tokens are minted by the extension, vaulted server-side via
+`credentials.deliver`, and consumed at the Gate A seal. The model never handles a
+challenger token. Honest caveat: the key is symmetric HMAC, so post-enrollment the
+sidecar *could* mint — challenger-token mint separation is procedural, while
+single-use / TTL / child-binding enforcement stays cryptographic and server-side.
+
+## String sniffing is gone
+
+There is no substring gate on model payloads (the old "ipython payload blocking" was
+removed in R5). Enforcement is structural: the single-writer sidecar boundary, scope
+policy, and per-identity verb ACLs at the RPC boundary. Denied calls stay denied;
+retrying a denial with a rewritten path is escape behavior, not debugging.
 
 ## UDS authentication
 
