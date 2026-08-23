@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -53,5 +54,8 @@ def recover_run(config: Any, run_id: str, state_root: Path | None) -> dict[str, 
         "run_id": run_id,
         "lease_reclaimed": lease_reclaimed,
         "graph_replay": replayed,
-        "reconciled_processes": [entry.__dict__ for entry in reconciled],
+        # ReconciledProcess is a slots dataclass: it has no __dict__, so
+        # asdict() is the correct serialization (found by S9.5's first
+        # real ext4 execution during R6 live preparation).
+        "reconciled_processes": [asdict(entry) for entry in reconciled],
     }

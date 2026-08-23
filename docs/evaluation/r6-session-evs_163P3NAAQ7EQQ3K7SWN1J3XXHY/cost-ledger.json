@@ -1,0 +1,115 @@
+{
+  "entries": [
+    {
+      "arm": "A0",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A0:eval-minivault:7:0",
+      "target_id": "eval-minivault",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A5",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A5:eval-minivault:7:1",
+      "target_id": "eval-minivault",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A0",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A0:eval-sharepool:7:2",
+      "target_id": "eval-sharepool",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A5",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A5:eval-sharepool:7:3",
+      "target_id": "eval-sharepool",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A0",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A0:eval-oracle-stale:7:4",
+      "target_id": "eval-oracle-stale",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A5",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A5:eval-oracle-stale:7:5",
+      "target_id": "eval-oracle-stale",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A0",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A0:eval-guarded-vault:7:6",
+      "target_id": "eval-guarded-vault",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A5",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A5:eval-guarded-vault:7:7",
+      "target_id": "eval-guarded-vault",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A0",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A0:eval-splitter-rounding:7:8",
+      "target_id": "eval-splitter-rounding",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    },
+    {
+      "arm": "A5",
+      "rate_source": "token_unit_disclosure",
+      "run_id": "evs_163P3NAAQ7EQQ3K7SWN1J3XXHY:A5:eval-splitter-rounding:7:9",
+      "target_id": "eval-splitter-rounding",
+      "tokens": {
+        "input": null,
+        "output": null
+      },
+      "usd": null
+    }
+  ],
+  "session_usd": 0.0
+}

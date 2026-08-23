@@ -87,6 +87,7 @@ def test_sigkill_mid_tool_run_zero_loss() -> None:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            start_new_session=True,  # pid == pgid so the killpg below is valid
         )
         deadline = time.monotonic() + 60
         while not ready.is_file() and time.monotonic() < deadline:
