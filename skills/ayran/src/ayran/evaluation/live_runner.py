@@ -23,7 +23,7 @@ from ayran.evaluation.partitions import enforce_at_harness_start
 from ayran.evaluation.paths import FIXED_SEEDS, PARSER_VERSION
 from ayran.evaluation.preregistration import Preregistration, require_preregistration
 from ayran.evaluation.results import write_manifest
-from ayran.evaluation.targets import TargetManifest
+from ayran.evaluation.targets import DEFAULT_TASK_TEXT, TargetManifest
 from ayran.evaluation.transport import ArmSpec, ArmTransport
 from ayran.graph.canonical import atomic_write, canonical_hash, utc_now
 from ayran.knowledge.models import KnowledgeRecord
@@ -232,6 +232,7 @@ def run_live_session(
                     ArmSpec(arm=arm, capabilities=list(spec.capabilities)),
                     target,
                     budget,
+                    task_text=target.task_text or DEFAULT_TASK_TEXT,
                 )
                 usd, rate_source = compute_cost_usd(
                     tokens_in=transcript.usage.input_tokens,

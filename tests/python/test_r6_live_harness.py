@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from ayran.evaluation.arms import arm_spec
 from ayran.evaluation.errors import (
     PREREGISTRATION_MISMATCH,
     PREREGISTRATION_REQUIRED,
@@ -17,7 +20,13 @@ from ayran.evaluation.models import PrimaryMetrics
 from ayran.evaluation.partitions import ContaminationViolation
 from ayran.evaluation.preregistration import EvalCaps, Preregistration, PricingRates, preregister
 from ayran.evaluation.targets import TargetGroundTruth, TargetManifest, select_targets
-from ayran.evaluation.transport import ArmTranscript, ArmUsage, ScriptedArmTransport
+from ayran.evaluation.transport import (
+    ArmSpec,
+    ArmTranscript,
+    ArmUsage,
+    LivePrimeTransport,
+    ScriptedArmTransport,
+)
 from ayran.knowledge.defihacklabs import contamination_group
 from ayran.knowledge.models import IncidentCard, LicenseInfo, SourceRef
 
@@ -188,8 +197,8 @@ def test_kill_switch_pauses_between_launches(tmp_path: Path) -> None:
     preregister(sheet, results_root=tmp_path, recorded_at="2026-08-23T00:00:00Z")
 
     class PauseAfterFirst(ScriptedArmTransport):
-        def run(self, arm, target, budget):  # type: ignore[no-untyped-def]
-            result = super().run(arm, target, budget)
+        def run(self, arm, target, budget, **kwargs):  # type: ignore[no-untyped-def]
+            result = super().run(arm, target, budget, **kwargs)
             write_pause_flag(tmp_path)
             return result
 
@@ -301,3 +310,98 @@ def test_example_target_manifests_load() -> None:
     assert "minivault-reentrancy" in ids
     assert "sharepool-inflation" in ids
     assert all(item.held_out for item in loaded)
+
+
+def test_stock_and_ayran_profiles_differ(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.append({"argv": list(argv), "env": kwargs.get("env")})
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("ayran.evaluation.transport.subprocess.run", fake_run)
+
+    task = "identical-question-for-both-arms"
+    target = _target("minivault-reentrancy", "reentrancy", 9.0)
+    socket = str(tmp_path / "ayran.sock")
+    token = str(tmp_path / "token")
+    transport = LivePrimeTransport(
+        configured=True,
+        prime_bin="prime",
+        ayran_socket_path=socket,
+        ayran_token_file=token,
+    )
+    transport.run(
+        ArmSpec(arm="A0", capabilities=list(arm_spec("A0").capabilities)),
+        target,
+        {},
+        task_text=task,
+    )
+    transport.run(
+        ArmSpec(arm="A5", capabilities=list(arm_spec("A5").capabilities)),
+        target,
+        {},
+        task_text=task,
+    )
+    assert len(captured) == 2
+    stock_argv = captured[0]["argv"]
+    ayran_argv = captured[1]["argv"]
+    assert isinstance(stock_argv, list)
+    assert isinstance(ayran_argv, list)
+    assert task in stock_argv
+    assert task in ayran_argv
+    assert stock_argv[-1] == ayran_argv[-1] == task
+    assert "--print" in stock_argv
+    assert "--ayran" not in stock_argv
+    stock_env = captured[0]["env"]
+    assert stock_env is None or (
+        isinstance(stock_env, dict)
+        and "AYRAN_SOCKET_PATH" not in stock_env
+        and "AYRAN_TOKEN_FILE" not in stock_env
+    )
+    assert "--ayran" in ayran_argv
+    assert "--print" in ayran_argv
+    ayran_env = captured[1]["env"]
+    assert isinstance(ayran_env, dict)
+    assert ayran_env.get("AYRAN_SOCKET_PATH") == socket
+    assert ayran_env.get("AYRAN_TOKEN_FILE") == token
+
+
+def test_timeout_yields_partial_transcript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    partial = "partial stdout before kill"
+
+    def boom(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(
+            cmd=["prime"],
+            timeout=0.01,
+            output=partial,
+            stderr="err-partial",
+        )
+
+    monkeypatch.setattr("ayran.evaluation.transport.subprocess.run", boom)
+
+    target = _target("minivault-reentrancy", "reentrancy", 9.0)
+    sheet = _prereg(targets=[target.target_id], session_usd=150.0)
+    preregister(sheet, results_root=tmp_path, recorded_at="2026-08-23T00:00:00Z")
+    live = LivePrimeTransport(configured=True, prime_bin="prime", timeout_s=0.01)
+    manifest = run_live_session(
+        preregistration=sheet,
+        transport=live,
+        targets=[target],
+        cards=[],
+        results_root=tmp_path,
+        created_at="2026-08-23T00:01:00Z",
+        seeds=(7,),
+    )
+    assert any(run.exit_status == "timeout" for run in manifest.arms)
+    assert any("timeout" in run.failures for run in manifest.arms)
+    transcripts = list(tmp_path.rglob("transcript.json"))
+    assert transcripts
+    body = json.loads(transcripts[0].read_text(encoding="utf-8"))
+    assert body["exit_status"] == "timeout"
+    assert partial in body["stdout"]
+    assert body["ended_at"]

@@ -13,6 +13,12 @@ from ayran.evaluation.partitions import enforce_at_harness_start
 from ayran.knowledge.models import KnowledgeRecord
 from ayran.tools.yaml_lite import load_yaml
 
+DEFAULT_TASK_TEXT = (
+    "Audit the Solidity sources in this workspace. Record every hypothesis you form "
+    "through the available recording interface, gather evidence in-scope, and finish "
+    "with your findings."
+)
+
 
 class TargetGroundTruth(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,6 +36,7 @@ class TargetManifest(BaseModel):
     ground_truth: list[TargetGroundTruth] = Field(default_factory=list)
     revision_or_commit: str
     held_out: bool = True
+    task_text: str = DEFAULT_TASK_TEXT
 
     def workspace(self, relative_to: Path | None = None) -> Path:
         path = Path(self.workspace_path)
