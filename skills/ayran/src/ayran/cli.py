@@ -293,6 +293,28 @@ def _parser() -> argparse.ArgumentParser:
     knowledge_tombstone.add_argument("--graph-root", type=Path)
     knowledge_tombstone.add_argument("--stream", type=Path)
     knowledge_tombstone.add_argument("--allow-unsafe-filesystem", action="store_true", help=argparse.SUPPRESS)
+    knowledge_audit = knowledge_sub.add_parser(
+        "audit-registry", help="audit registry entries for fabricated ids and incomplete provenance"
+    )
+    _add_config(knowledge_audit)
+    knowledge_audit.add_argument("--knowledge-root", type=Path)
+    knowledge_ingest_dhl = knowledge_sub.add_parser(
+        "ingest-defihacklabs", help="offline ingest of a pinned DeFiHackLabs checkout"
+    )
+    _add_config(knowledge_ingest_dhl)
+    knowledge_ingest_dhl.add_argument("root", type=Path)
+    knowledge_ingest_dhl.add_argument("--commit", required=True)
+    knowledge_ingest_dhl.add_argument("--archive-sha256", required=True)
+    knowledge_ingest_dhl.add_argument("--limit", type=int)
+    knowledge_ingest_dhl.add_argument("--knowledge-root", type=Path)
+    knowledge_ingest_krait = knowledge_sub.add_parser(
+        "ingest-krait", help="deep-ingest a pinned Krait check corpus"
+    )
+    _add_config(knowledge_ingest_krait)
+    knowledge_ingest_krait.add_argument("root", type=Path)
+    knowledge_ingest_krait.add_argument("--commit", required=True)
+    knowledge_ingest_krait.add_argument("--archive-sha256", required=True)
+    knowledge_ingest_krait.add_argument("--knowledge-root", type=Path)
 
     learning = sub.add_parser("learning", help="Learning Graph capture, review, promotion, and rollback")
     learning_sub = learning.add_subparsers(dest="learning_command", required=True)
@@ -789,6 +811,29 @@ def _command_knowledge(arguments: argparse.Namespace) -> dict[str, Any]:
                 root,
                 record_type=str(arguments.record_type),
                 filters=_json_object(getattr(arguments, "query_filter", None)),
+            )
+        if command == "audit-registry":
+            from ayran.knowledge.registry_audit import audit_registry
+
+            return audit_registry(root)
+        if command == "ingest-defihacklabs":
+            from ayran.knowledge.service import ingest_defihacklabs
+
+            return ingest_defihacklabs(
+                root,
+                arguments.root,
+                commit=str(arguments.commit),
+                archive_sha256=str(arguments.archive_sha256),
+                limit=getattr(arguments, "limit", None),
+            )
+        if command == "ingest-krait":
+            from ayran.knowledge.service import ingest_krait_deep
+
+            return ingest_krait_deep(
+                root,
+                arguments.root,
+                commit=str(arguments.commit),
+                archive_sha256=str(arguments.archive_sha256),
             )
         store = _optional_store(arguments)
         if command == "ingest":

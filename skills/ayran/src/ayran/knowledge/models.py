@@ -140,6 +140,7 @@ class KnowledgeRecord(BaseModel):
     raw_hash: str
     parser_version: str
     license_info: LicenseInfo
+    sanitizers: list[str] = Field(default_factory=list)
     title: str = ""
     summary: str = ""
     citation: str | None = None
@@ -220,6 +221,7 @@ class KnowledgeRecord(BaseModel):
         "symptoms",
         "affected_protocols",
         "taxonomy",
+        "sanitizers",
         mode="before",
     )
     @classmethod
@@ -254,6 +256,17 @@ class MechanismCard(KnowledgeRecord):
 
 class IncidentCard(KnowledgeRecord):
     record_type: Literal["incident"] = "incident"
+    contamination_group: str = ""
+    exploit_block: int | None = None
+    loss_amount: str | None = None
+    attack_tx_hash: str | None = None
+    attacker_address: str | None = None
+    assertions_verbatim: list[str] = Field(default_factory=list)
+
+    @field_validator("assertions_verbatim", mode="before")
+    @classmethod
+    def _assertions(cls, value: Any) -> list[str]:
+        return _as_str_list(value)
 
 
 class SpecialistSkill(KnowledgeRecord):

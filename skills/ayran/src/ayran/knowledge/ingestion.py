@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from ayran.context.ids import content_id
-from ayran.graph.canonical import canonical_line
+from ayran.graph.canonical import canonical_line, sha256_bytes
 from ayran.knowledge.conflicts import attach_conflicts, detect_conflicts
+from ayran.knowledge.defihacklabs import incident_payload, iter_exploit_files
 from ayran.knowledge.entity_resolution import apply_resolution, resolve_against
 from ayran.knowledge.errors import (
     INGESTION_QUARANTINED,
@@ -21,6 +22,7 @@ from ayran.knowledge.errors import (
     KnowledgeError,
 )
 from ayran.knowledge.hard_negatives import ensure_hard_negatives
+from ayran.knowledge.krait_deep import parse_krait_check_block
 from ayran.knowledge.models import (
     KnowledgeRecord,
     LicenseInfo,
@@ -39,6 +41,13 @@ from ayran.knowledge.paths import (
     staging_dir,
 )
 from ayran.knowledge.safety import scan_mapping, scan_text
+from ayran.knowledge.sanitizers import (
+    check_hostile_hash,
+    load_hostile_hashes,
+    sanitize_darknavy_curl_strip,
+    sanitize_shuvon_amp_rewrite,
+    scan_execution_artifacts,
+)
 from ayran.knowledge.source_registry import get_source, save_source
 from ayran.knowledge.taxonomy import assign_taxonomy, load_taxonomy
 
@@ -46,8 +55,12 @@ INGESTION_STAGES = (
     "registry_proposal",
     "acquire_pin",
     "immutable_quarantine",
+    "blacklist_hook",
+    "execution_artifact_scan",
+    "hostile_hash_check",
     "static_parse",
     "injection_safety_scan",
+    "sanitize_transforms",
     "normalize",
     "provenance_rights",
     "taxonomy_map",
@@ -114,7 +127,8 @@ def stage_registry_proposal(ctx: IngestionContext) -> StageOutcome:
 
 
 def stage_acquire_pin(ctx: IngestionContext) -> StageOutcome:
-    snapshot = snapshot_tree(raw_dir(ctx.knowledge_root, ctx.source.source_id))
+    raw_root = raw_dir(ctx.knowledge_root, ctx.source.source_id)
+    snapshot = snapshot_tree(raw_root)
     if not snapshot.files:
         return ctx.quarantine("acquire_pin", "approved snapshot is missing locally; network fetch is forbidden")
     expected = ctx.source.pin.archive_sha256
@@ -126,8 +140,11 @@ def stage_acquire_pin(ctx: IngestionContext) -> StageOutcome:
         )
     ctx.working["files"] = snapshot.files
     ctx.working["tree_hash"] = snapshot.tree_hash
+    ctx.working["artifacts"] = {
+        str(item["path"]): (raw_root / str(item["path"])).read_bytes()
+        for item in snapshot.files
+    }
     if ctx.artifact_store is not None:
-        raw_root = raw_dir(ctx.knowledge_root, ctx.source.source_id)
         for item in snapshot.files:
             payload = (raw_root / item["path"]).read_bytes()
             ctx.artifact_store.store(payload, media_type="application/octet-stream", source="knowledge-raw")
@@ -147,8 +164,116 @@ def stage_immutable_quarantine(ctx: IngestionContext) -> StageOutcome:
     return StageOutcome(ok=True)
 
 
+def stage_blacklist_hook(ctx: IngestionContext) -> StageOutcome:
+    """Spec 11.3 item 2: blacklisted sources hard-fail before any parsing."""
+
+    blacklisted = sorted(flag for flag in ctx.source.contamination_flags if flag.startswith("blacklisted"))
+    if ctx.source.source_id == "olaradial" or blacklisted:
+        detail = f"SOURCE_BLACKLISTED: flags {blacklisted}" if blacklisted else "SOURCE_BLACKLISTED"
+        return ctx.quarantine(
+            "blacklist_hook",
+            f"{detail}; {ctx.source.source_id} is on the permanent blacklist "
+            "(spec 11.3 item 2) and can never be ingested",
+        )
+    return StageOutcome(ok=True)
+
+
+def stage_execution_artifact_scan(ctx: IngestionContext) -> StageOutcome:
+    """Spec 11.3: archives/binaries/installers/auto-fetch bait never enter staging."""
+
+    artifacts = ctx.working.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return StageOutcome(ok=True)
+    for name in sorted(artifacts):
+        data = artifacts.get(name)
+        if not isinstance(data, bytes):
+            continue
+        reasons = scan_execution_artifacts(str(name), data)
+        if reasons:
+            digest = sha256_bytes(data)
+            return ctx.quarantine(
+                "execution_artifact_scan",
+                f"artifact {name}: " + "; ".join(reasons),
+                locator=str(name),
+                raw_hash=digest,
+            )
+    return StageOutcome(ok=True)
+
+
+def stage_hostile_hash_check(ctx: IngestionContext) -> StageOutcome:
+    """Spec 6.1: SHA256 hostile-artifact blocklist (Olaradial lineage)."""
+
+    artifacts = ctx.working.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return StageOutcome(ok=True)
+    table = load_hostile_hashes(ctx.knowledge_root)
+    for name in sorted(artifacts):
+        data = artifacts.get(name)
+        if not isinstance(data, bytes):
+            continue
+        digest = sha256_bytes(data)
+        reason = check_hostile_hash(digest.split(":", 1)[-1], table)
+        if reason is not None:
+            return ctx.quarantine(
+                "hostile_hash_check",
+                f"artifact {name}: {reason}",
+                locator=str(name),
+                raw_hash=digest,
+            )
+    return StageOutcome(ok=True)
+
+
+def _defihacklabs_parsed(ctx: IngestionContext, raw_root: Path) -> list[ParsedRecord] | None:
+    if not (raw_root / "src" / "test").is_dir():
+        return None
+    parsed: list[ParsedRecord] = []
+    irregular: list[dict[str, str]] = []
+    commit = ctx.source.pin.commit
+    for entry in iter_exploit_files(raw_root, max_bytes=ctx.max_record_bytes):
+        if entry.card is None:
+            irregular.append({"relpath": entry.relpath, "reason": entry.reason or "irregular layout"})
+            continue
+        payload = incident_payload(entry.card, commit=commit)
+        parsed.append(
+            ParsedRecord(
+                locator=entry.relpath,
+                payload=payload,
+                raw_hash=sha256_bytes(entry.path.read_bytes()),
+                kind="code",
+            )
+        )
+    ctx.working["defihacklabs_irregular"] = irregular
+    ctx.working["defihacklabs_cards"] = len(parsed)
+    return parsed
+
+
+def _krait_deep_parsed(ctx: IngestionContext) -> list[ParsedRecord]:
+    files = ctx.working.get("krait_deep_files") or []
+    parsed: list[ParsedRecord] = []
+    for relpath, text in files:
+        if not isinstance(text, str):
+            continue
+        digest = sha256_bytes(text.encode("utf-8"))
+        for key, values in parse_krait_check_block(text).items():
+            parsed.append(
+                ParsedRecord(
+                    locator=f"{relpath}#{key}",
+                    payload=values,
+                    raw_hash=digest,
+                    kind="yaml",
+                )
+            )
+    return parsed
+
+
 def stage_static_parse(ctx: IngestionContext) -> StageOutcome:
-    parsed = parse_tree(raw_dir(ctx.knowledge_root, ctx.source.source_id), max_bytes=ctx.max_record_bytes)
+    raw_root = raw_dir(ctx.knowledge_root, ctx.source.source_id)
+    if ctx.working.get("static_parse_preset") == "krait_deep":
+        parsed: list[ParsedRecord] | None = _krait_deep_parsed(ctx)
+    else:
+        parsed = _defihacklabs_parsed(ctx, raw_root)
+        if parsed is None:
+            parsed = parse_tree(raw_root, max_bytes=ctx.max_record_bytes)
     if not parsed:
         return ctx.quarantine("static_parse", "static parse produced no records")
     ctx.working["parsed"] = parsed
@@ -186,6 +311,75 @@ def stage_injection_safety_scan(ctx: IngestionContext) -> StageOutcome:
     return StageOutcome(ok=True)
 
 
+def _sanitize_text(text: str) -> tuple[str, list[str]]:
+    applied: list[str] = []
+    for transform, label in (
+        (sanitize_darknavy_curl_strip, "darknavy_curl_strip"),
+        (sanitize_shuvon_amp_rewrite, "shuvon_amp_rewrite"),
+    ):
+        cleaned, changed = transform(text)
+        if changed:
+            text = cleaned
+            applied.append(label)
+    return text, applied
+
+
+def stage_sanitize_transforms(ctx: IngestionContext) -> StageOutcome:
+    """Spec 6.5/11.3: apply recorded sanitizer transforms; keep before/after hashes."""
+
+    log: list[dict[str, Any]] = []
+    applied_by_locator: dict[str, list[str]] = {}
+    source_applied: list[str] = []
+    artifacts = ctx.working.get("artifacts")
+    if isinstance(artifacts, dict):
+        for name in sorted(artifacts):
+            data = artifacts.get(name)
+            if not isinstance(data, bytes):
+                continue
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            cleaned, applied = _sanitize_text(text)
+            if not applied:
+                continue
+            encoded = cleaned.encode("utf-8")
+            artifacts[str(name)] = encoded
+            source_applied.extend(applied)
+            log.append(
+                {
+                    "artifact": str(name),
+                    "before": sha256_bytes(data),
+                    "after": sha256_bytes(encoded),
+                    "sanitizers": applied,
+                }
+            )
+    for item in ctx.working.get("parsed") or []:
+        if not isinstance(item, ParsedRecord):
+            continue
+        body = item.payload.get("body")
+        if not isinstance(body, str):
+            continue
+        cleaned, applied = _sanitize_text(body)
+        if not applied:
+            continue
+        item.payload["body"] = cleaned
+        applied_by_locator[item.locator] = applied
+        source_applied.extend(applied)
+        log.append(
+            {
+                "artifact": item.locator,
+                "before": sha256_bytes(body.encode("utf-8")),
+                "after": sha256_bytes(cleaned.encode("utf-8")),
+                "sanitizers": applied,
+            }
+        )
+    ctx.working["sanitize_log"] = log
+    ctx.working["applied_sanitizers"] = sorted(set(source_applied))
+    ctx.working["sanitizers_by_locator"] = applied_by_locator
+    return StageOutcome(ok=True)
+
+
 def _license(entry: SourceRegistryEntry) -> LicenseInfo:
     if not entry.license.spdx_id:
         raise KnowledgeError(LICENSE_INCOMPLETE, f"{entry.source_id} is missing SPDX license metadata")
@@ -216,6 +410,13 @@ def _normalize_one(ctx: IngestionContext, parsed: ParsedRecord) -> KnowledgeReco
     payload.setdefault("reproduction_status", ctx.source.reproduction_status)
     payload.setdefault("safe_for_execution", False)
     payload.setdefault("title", slug.replace("-", " "))
+    record_sanitizers = sorted(
+        set(
+            list(ctx.working.get("applied_sanitizers") or [])
+            + list((ctx.working.get("sanitizers_by_locator") or {}).get(parsed.locator) or [])
+        )
+    )
+    payload.setdefault("sanitizers", record_sanitizers)
     if "record_type" not in payload:
         payload["record_type"] = "method"
     if payload.get("hard_negative") in {True, "true"}:
@@ -324,8 +525,12 @@ STAGE_FUNCTIONS: dict[str, Callable[[IngestionContext], StageOutcome]] = {
     "registry_proposal": stage_registry_proposal,
     "acquire_pin": stage_acquire_pin,
     "immutable_quarantine": stage_immutable_quarantine,
+    "blacklist_hook": stage_blacklist_hook,
+    "execution_artifact_scan": stage_execution_artifact_scan,
+    "hostile_hash_check": stage_hostile_hash_check,
     "static_parse": stage_static_parse,
     "injection_safety_scan": stage_injection_safety_scan,
+    "sanitize_transforms": stage_sanitize_transforms,
     "normalize": stage_normalize,
     "provenance_rights": stage_provenance_rights,
     "taxonomy_map": stage_taxonomy_map,

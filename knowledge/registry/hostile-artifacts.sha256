@@ -1,0 +1,8 @@
+# Ayran hostile-artifact SHA256 blocklist (spec 6.1 / 11.3).
+# Format: <64-hex sha256>  <label>
+# Mechanism ships today; the operator appends the true Olaradial dropper
+# archive sha256 when available (the documented dropper archive hash is not
+# yet published as bytes). Hash-matching content is hostile regardless of
+# the name it travels under - see knowledge/registry/olaradial.yaml for the
+# permanent blacklist lineage record.
+0000000000000000000000000000000000000000000000000000000000000000  olaradial-dropper-placeholder

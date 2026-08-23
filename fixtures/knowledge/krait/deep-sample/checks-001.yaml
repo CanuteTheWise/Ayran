@@ -1,0 +1,26 @@
+check_id: KRAIT-0007
+name: Unprotected initialize on upgradeable proxy
+severity: high
+solc: ">=0.5.0 <0.8.21"
+patterns:
+  - function initialize(
+  - selector:0x8129fc1c
+standards:
+  - ERC20
+  - proxy
+summary: initialize lacks access control and stays callable after setup.
+---
+check_id: KRAIT-0042
+name: Unchecked transfer return in claim path
+severity: medium
+solc: ">=0.6.0"
+patterns:
+  - .transfer(
+standards:
+  - ERC20
+summary: transfer return value is ignored in the claim loop.
+---
+check_id: KRAIT-0099
+name: Deprecated tx.origin authorization check
+severity: low
+summary: tx.origin is used for authorization.
