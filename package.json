@@ -1,6 +1,6 @@
 {
   "name": "@ayran/prime-package",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "private": true,
   "description": "Ayran Prime 0.7.2 package: canonical contracts, Graph Fabric, sidecar, and lifecycle bridge",
   "type": "module",
@@ -58,7 +58,7 @@
     ]
   },
   "ayran": {
-    "milestone": "R5",
+    "milestone": "R6",
     "runtimeImplemented": true,
     "primeBoundary": "external-unmodified-peer",
     "canonicalContracts": "schemas/contracts.schema.json"

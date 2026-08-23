@@ -28,7 +28,7 @@ def test_find_compatibility_dir_resolves_authored_tree() -> None:
 
 
 def test_find_compatibility_dir_resolves_installed_layout(tmp_path: Path) -> None:
-    payload = tmp_path / "versions" / "0.1.6" / "ayran"
+    payload = tmp_path / "versions" / "0.2.0" / "ayran"
     payload_compat = payload / "compatibility"
     payload_compat.mkdir(parents=True)
     shutil.copyfile(ROOT / "compatibility" / "prime-lock.json", payload_compat / "prime-lock.json")
@@ -78,7 +78,7 @@ def test_version_alignment_authored_tree() -> None:
     project = tomllib.loads((manifest_root / "pyproject.toml").read_text(encoding="utf-8"))[
         "project"
     ]
-    assert RELEASE_VERSION == "0.1.6"
+    assert RELEASE_VERSION == "0.2.0"
     assert package["version"] == RELEASE_VERSION
     assert project["version"] == RELEASE_VERSION
     assert locks.versions_align(
@@ -91,12 +91,12 @@ def test_version_alignment_synthetic_mismatch(tmp_path: Path) -> None:
     pyproject_toml = tmp_path / "pyproject.toml"
     package_json.write_text(json.dumps({"version": "9.9.9"}), encoding="utf-8")
     pyproject_toml.write_text(
-        '[project]\nname = "synthetic"\nversion = "0.1.6"\n', encoding="utf-8"
+        '[project]\nname = "synthetic"\nversion = "0.2.0"\n', encoding="utf-8"
     )
-    assert locks.versions_align(package_json, pyproject_toml, "0.1.6") is False
-    package_json.write_text(json.dumps({"version": "0.1.6"}), encoding="utf-8")
-    assert locks.versions_align(package_json, pyproject_toml, "0.1.6") is True
-    assert locks.versions_align(tmp_path / "absent.json", pyproject_toml, "0.1.6") is False
+    assert locks.versions_align(package_json, pyproject_toml, "0.2.0") is False
+    package_json.write_text(json.dumps({"version": "0.2.0"}), encoding="utf-8")
+    assert locks.versions_align(package_json, pyproject_toml, "0.2.0") is True
+    assert locks.versions_align(tmp_path / "absent.json", pyproject_toml, "0.2.0") is False
 
 
 def test_doctor_reports_lock_and_version_checks(tmp_path: Path) -> None:
