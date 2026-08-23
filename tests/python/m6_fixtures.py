@@ -299,7 +299,7 @@ def challenger_gate_a(
     """Scripted-challenger Gate A round trip: mint a per-spawn credential and submit."""
 
     from ayran.evidence.service import gate_a
-    from ayran.gates.spawn_challenger import CredentialAuthority
+    from ayran.gates.credentials import CredentialAuthority
 
     authority = credentials or CredentialAuthority(b"m6-test-authority")
     token = authority.mint_challenger(child_id=child_id)

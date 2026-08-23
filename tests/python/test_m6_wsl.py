@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 from pathlib import Path
@@ -82,6 +83,11 @@ def _start(tmp_path: Path) -> tuple[AyranServer, Path, bytes, GraphStore, Any]:
         state_root=tmp_path,
         run_root=run_root,
     )
+    enrolled = dispatcher.dispatch(
+        "credentials.enroll",
+        {"key_b64": base64.b64encode(b"m6-wsl-enroll-key-32-bytes-aaaaaa"[:32]).decode("ascii")},
+    )
+    assert enrolled["accepted"] is True
     sock = tmp_path / "ayrand.sock"
     token = b"m6-test-token"
 

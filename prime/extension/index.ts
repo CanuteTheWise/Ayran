@@ -4,12 +4,14 @@
  */
 
 import { createRuntime, type RuntimeState } from "./bootstrap.ts";
+import { enrollCredentials } from "./credentials.ts";
 import { registerCommands } from "./commands.ts";
 import { registerHooks } from "./hooks.ts";
 import type { ExtensionAPI } from "./prime-api.ts";
 
 export type { ExtensionAPI, ExtensionFactory } from "./prime-api.ts";
 export { createRuntime, loadSettings } from "./bootstrap.ts";
+export { CredentialMinter, enrollCredentials } from "./credentials.ts";
 export { registerCommands } from "./commands.ts";
 export { registerHooks } from "./hooks.ts";
 export { SidecarClient, SidecarError } from "./sidecar.ts";
@@ -36,6 +38,10 @@ export function activate(
     }
     registerHooks(pi, runtime);
     registerCommands(pi, runtime);
+    // §11.4/W7: enroll the extension-generated session key once at activation
+    // (idempotent; silently tolerated when the sidecar is not up yet —
+    // /ayran:activate retries enrollment after ensureSidecar).
+    void enrollCredentials(runtime).catch(() => undefined);
     runtime.telemetry.event("info", "ayran.extension.loaded", {
       sidecar_configured: Boolean(runtime.settings.sidecarSocketPath),
       session_active: runtime.sessionActive,

@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { ChildProcess } from "node:child_process";
+import { CredentialMinter } from "./credentials.ts";
 import { SidecarClient } from "./sidecar.ts";
 import { Telemetry, type TelemetryLevel } from "./telemetry.ts";
 
@@ -40,6 +41,8 @@ export interface RuntimeState {
   settings: AyranSettings;
   sidecar: SidecarClient;
   telemetry: Telemetry;
+  credentials: CredentialMinter;
+  credentialsEnrolled: boolean;
   kernelManaged: boolean | undefined;
   lastPackHash: string | undefined;
   lastSessionReason: string | undefined;
@@ -140,6 +143,8 @@ export function createRuntime(cwd: string): RuntimeState {
     settings,
     sidecar,
     telemetry,
+    credentials: new CredentialMinter(),
+    credentialsEnrolled: false,
     kernelManaged: undefined,
     lastPackHash: undefined,
     lastSessionReason: undefined,

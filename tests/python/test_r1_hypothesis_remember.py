@@ -8,6 +8,7 @@ the S9.1 clause-3 inequality assertion stays runnable forever.
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,7 @@ from ayran.compatibility.locks import check_compatibility
 from ayran.config.models import EffectiveConfig
 from ayran.evidence.load import load_hypotheses, load_hypothesis
 from ayran.evidence.service import ORIGIN_WRITER_ALLOWLIST, remember
-from ayran.gates.spawn_challenger import (
+from ayran.gates.credentials import (
     CREDENTIAL_GRANT_REMEMBER,
     CredentialAuthority,
     CredentialError,
@@ -351,6 +352,11 @@ def test_session_writer_credentials_mint_verify_expire() -> None:
 def test_remember_via_credential_bound_specialist_writer(tmp_path: Path) -> None:
     dispatcher, store = _sidecar(tmp_path)
     try:
+        enrolled = dispatcher.dispatch(
+            "credentials.enroll",
+            {"key_b64": base64.b64encode(b"a-fixed-32-byte-test-key-aaaaaaa").decode()},
+        )
+        assert enrolled["accepted"] is True
         token = dispatcher.credentials.mint_session_writer(
             session="sess-02j", writer_kind="specialist", writer_id="rlm:child-02j"
         )

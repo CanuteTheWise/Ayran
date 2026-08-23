@@ -26,14 +26,23 @@ from ayran.runtime.status import reconstruct_status
 from ayran.runtime.stop import stop_run
 
 if TYPE_CHECKING:
-    from ayran.gates.spawn_challenger import CredentialAuthority
+    from ayran.gates.credentials import CredentialAuthority
     from ayran.tools.registry import CapabilityRegistry
-
-AYRAN_TOOLS = {"ayran.graph_query", "ayran.artifact_store"}
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _denial_reason(decision: Any) -> str:
+    """Honest wire reason for a policy decision (S9.4: contains SCOPE_DENIED)."""
+
+    if decision.permitted:
+        return str(decision.reason)
+    scope_reason = getattr(decision.scope_decision, "reason", None)
+    if scope_reason:
+        return f"SCOPE_DENIED: {scope_reason}"
+    return str(decision.reason)
 
 
 def _tool_action(tool_name: str, arguments: dict[str, Any]) -> tuple[str, str]:
@@ -46,21 +55,16 @@ def _tool_action(tool_name: str, arguments: dict[str, Any]) -> tuple[str, str]:
     )
     if not resource:
         resource = "target/src"
-    if name in {"ayran.graph_query"}:
-        return "graph_read", resource
-    if name in {"ayran.artifact_store"}:
-        return "graph_write", resource
     if name in {"edit", "write"}:
         return "compile_local", resource
     if name in {"read"}:
         return "read_source", resource
     if name == "bash" and ("path" in arguments or "file" in arguments):
         return "test_local", resource
-    if name == "ipython":
-        code = str(arguments.get("code") or "")
-        if "ayran." in code:
-            return "graph_write", resource
-        return name, resource
+    # ipython maps to a plain ("ipython", resource) action: string-sniffing of
+    # payloads is retired (§7.2 row 2) — enforcement is the single-writer
+    # sidecar boundary + scope + verb ACLs at the RPC boundary, never
+    # substring heuristics in tool payloads.
     return name, resource or "."
 
 
@@ -82,18 +86,29 @@ class BridgeDispatcher:
     children: dict[str, dict[str, Any]] = field(default_factory=dict)
     isolation_tampered: bool = False
     _credentials: CredentialAuthority | None = field(default=None, repr=False)
+    _delivered_credentials: dict[str, str] = field(default_factory=dict, repr=False)
     _isolation_report: dict[str, Any] | None = field(default=None, repr=False)
     _lock: Lock = field(default_factory=Lock)
     _tools_registry: CapabilityRegistry | None = field(default=None, repr=False)
 
     @property
     def credentials(self) -> CredentialAuthority:
-        """Per-run credential authority (§11.4); lazily built to avoid import cycles."""
+        """Enrolled per-run credential authority (§11.4); fail-closed until enrolled.
+
+        Key GENERATION lives only in the extension: this process constructs the
+        authority from the key enrolled via ``credentials.enroll`` (or supplied
+        explicitly at construction) and only verifies/consumes against it. Any
+        method needing the authority before enrollment fails closed with
+        ``CREDENTIAL_UNENROLLED``.
+        """
 
         if self._credentials is None:
-            from ayran.gates.spawn_challenger import CredentialAuthority
+            from ayran.gates.credentials import CredentialError
 
-            self._credentials = CredentialAuthority()
+            raise CredentialError(
+                "UNENROLLED",
+                details={"hint": "call credentials.enroll (or construct with credentials) first"},
+            )
         return self._credentials
 
     @property
@@ -169,10 +184,13 @@ class BridgeDispatcher:
             "maps.get": self.maps_get,
             "maps.build": self.maps_build,
             "evidence.transition": self.evidence_transition,
+            "evidence.attach": self.evidence_attach,
             "evidence.gate_a": self.evidence_gate_a,
             "evidence.gate_b": self.evidence_gate_b,
             "hypotheses.remember": self.hypotheses_remember,
             "challenger.prepare": self.challenger_prepare,
+            "credentials.enroll": self.credentials_enroll,
+            "credentials.deliver": self.credentials_deliver,
             "evidence.dedup_check": self.evidence_dedup_check,
             "evidence.impact_assess": self.evidence_impact_assess,
             "evidence.severity_assess": self.evidence_severity_assess,
@@ -433,7 +451,50 @@ class BridgeDispatcher:
         resource = str(params.get("resource") or ".")
         decision = self.policy.authorize(action, resource=resource)
         if not decision.permitted:
-            raise PermissionError(decision.reason)
+            reason = _denial_reason(decision)
+            self._journal_policy_denial(
+                request_type="rpc_write", action=action, resource=resource, reason=reason
+            )
+            raise PermissionError(reason)
+
+    def _journal_policy_denial(
+        self,
+        *,
+        request_type: str,
+        action: str,
+        resource: str,
+        reason: str,
+        tool_name: str = "",
+    ) -> None:
+        """Journal a boundary denial with actor=policy in the event payload (S9.4).
+
+        The graph actor enum is closed (no ``policy`` kind), so the policy
+        actor identity lives in the journal event payload itself.
+        """
+
+        payload: dict[str, Any] = {
+            "actor": "policy",
+            "request_type": request_type,
+            "action": action[:128],
+            "resource": resource[:512],
+            "reason": reason[:512],
+        }
+        if tool_name:
+            payload["tool_name"] = tool_name[:128]
+        try:
+            record_session_event(
+                self.store,
+                run_id=self.run_id,
+                event_type="policy_denial",
+                payload=payload,
+            )
+        except Exception as error:  # a journaling failure must never mask the denial itself
+            self.logger.event(
+                "WARN",
+                "bridge.policy_denial_journal_failed",
+                request_type=request_type,
+                error=type(error).__name__,
+            )
 
     def evidence_transition(self, params: dict[str, Any]) -> dict[str, Any]:
         from ayran.evidence.errors import EvidenceError
@@ -474,16 +535,21 @@ class BridgeDispatcher:
         """Writer identity derived SERVER-SIDE from the channel credential mapping (§11.4)."""
 
         from ayran.evidence.errors import CREDENTIAL_DENIED, WRITER_IMPERSONATION, EvidenceError
-        from ayran.gates.spawn_challenger import (
-            CREDENTIAL_GRANT_REMEMBER,
-            CredentialError,
-        )
+        from ayran.gates.credentials import CREDENTIAL_GRANT_REMEMBER, CredentialError
 
         session = str(params.get("session") or self.run_id)
         raw_credential = params.get("credential") or params.get("writer_credential")
         if raw_credential:
+            if self._credentials is None:
+                # Fail closed (§11.4/W7): no credential can verify before the
+                # extension-side key has been enrolled.
+                raise EvidenceError(
+                    "CREDENTIAL_UNENROLLED",
+                    "writer credential refused: no credential key is enrolled; "
+                    "call credentials.enroll first",
+                )
             try:
-                payload = self.credentials.verify(str(raw_credential), grant=CREDENTIAL_GRANT_REMEMBER)
+                payload = self._credentials.verify(str(raw_credential), grant=CREDENTIAL_GRANT_REMEMBER)
             except CredentialError as error:
                 raise EvidenceError(
                     CREDENTIAL_DENIED,
@@ -568,18 +634,46 @@ class BridgeDispatcher:
         analysis = params.get("analysis")
         submission = params.get("submission")
         credential = params.get("credential") or params.get("challenger_credential")
+        child_id = str(params.get("child_id") or "")
         try:
             self._require_isolation()
-            return gate_a(
+            # §11.4/W7: when the caller omits the credential (the model-facing
+            # flow), the token minted by the EXTENSION and vaulted via
+            # credentials.deliver is used implicitly — the model never handles
+            # a challenger token. Explicit credentials keep working so CI and
+            # headless harnesses can act AS the extension client.
+            vaulted = False
+            if not credential and child_id and submission is not None:
+                vaulted_token = self._delivered_credentials.get(child_id)
+                if vaulted_token is None:
+                    raise EvidenceError(
+                        CREDENTIAL_DENIED,
+                        f"no unconsumed vaulted credential for child {child_id}; "
+                        "the extension must mint and deliver it first",
+                        details={"child_id": child_id},
+                    )
+                credential = vaulted_token
+                vaulted = True
+            if credential is not None and self._credentials is None:
+                raise EvidenceError(
+                    "CREDENTIAL_UNENROLLED",
+                    "challenger credential refused: no credential key is enrolled; "
+                    "call credentials.enroll first",
+                )
+            return_value = gate_a(
                 self.store,
                 str(params.get("hypothesis_id") or ""),
                 analysis=analysis if isinstance(analysis, dict) else None,
                 submission=submission if isinstance(submission, dict) else None,
                 credential=str(credential) if credential else None,
-                credentials=self.credentials,
+                credentials=self._credentials,
                 reconcile=bool(params.get("reconcile")),
                 transcript_hash=str(params["transcript_hash"]) if params.get("transcript_hash") else None,
             )
+            if vaulted and isinstance(return_value, dict) and return_value.get("record") is not None:
+                # Sealed: the vaulted single-use token was consumed at the seal.
+                self._delivered_credentials.pop(child_id, None)
+            return return_value
         except EvidenceError as error:
             if error.code == VERDICT_OVERRIDE_FORBIDDEN:
                 self._journal_denial(
@@ -599,14 +693,28 @@ class BridgeDispatcher:
                     session_id=str(params.get("session") or self.run_id),
                     reason=f"{error.code}: {error.message}",
                 )
+            elif error.code == "CREDENTIAL_UNENROLLED":
+                self._journal_denial(
+                    "credential_unenrolled",
+                    session_id=str(params.get("session") or self.run_id),
+                    reason=f"{error.code}: {error.message}",
+                )
+            else:
+                self._journal_denial(
+                    "challenger_credential_denied",
+                    session_id=str(params.get("session") or self.run_id),
+                    reason=f"{error.code}: {error.message}",
+                )
             return error.as_result()
 
     def challenger_prepare(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Root-skill Gate A preparation: blind bundle + per-spawn credential.
+        """Root-skill Gate A preparation: blind bundle only (§7.1, §11.4/W7).
 
-        The sidecar never spawns agents: this mints the short-TTL child-bound
-        credential (§11.4) and returns the knowledge-blind bundle (§5.5) so the
-        root skill can drive the challenger round trip itself.
+        The sidecar never spawns agents and no longer mints challenger
+        credentials: key generation lives only in the extension, which mints
+        the child-bound ``gate_a_submission`` token and vaults it via
+        ``credentials.deliver``. This method returns the knowledge-blind bundle
+        (§5.5) so the root skill can drive the challenger round trip itself.
         """
 
         from ayran.evidence.errors import (
@@ -632,21 +740,11 @@ class BridgeDispatcher:
                     HYPOTHESIS_NOT_FOUND,
                     f"hypothesis {hypothesis_id} was not found",
                 ) from error
-            token = self.credentials.mint_challenger(child_id=child_id)
-            record_session_event(
-                self.store,
-                run_id=self.run_id,
-                event_type="challenger_credential_minted",
-                payload={
-                    "reason": f"per-spawn credential minted for rlm:{child_id}",
-                    "session_id": str(params.get("session") or self.run_id)[:128],
-                },
-            )
             return {
                 "schema_version": "1.0.0",
                 "child_id": child_id,
                 "hypothesis_id": hypothesis_id,
-                "credential": token,
+                "credential_minter": "extension",
                 "bundle": bundle,
                 "isolation": self.isolation_report(),
                 "spool_root": str(self.spool_root),
@@ -654,6 +752,255 @@ class BridgeDispatcher:
         except EvidenceError as error:
             self._journal_denial(
                 "challenger_prepare_denied",
+                session_id=str(params.get("session") or self.run_id),
+                reason=f"{error.code}: {error.message}",
+            )
+            return error.as_result()
+
+    def credentials_enroll(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Enroll the run's credential key (§11.4/W7 relocation).
+
+        The extension generates the 32-byte session key and enrolls it over the
+        bearer-authenticated channel; this process constructs the run's
+        :class:`CredentialAuthority` FROM those bytes and only verifies and
+        consumes against them afterwards. Second enrollment fails closed with
+        ``CREDENTIAL_ALREADY_ENROLLED``. The journal event never carries key
+        material or tokens.
+        """
+
+        import base64
+        import binascii
+
+        from ayran.gates.credentials import CredentialAuthority, CredentialError
+
+        raw = str(params.get("key_b64") or "").strip()
+        try:
+            key = base64.b64decode(raw, validate=True)
+        except (ValueError, binascii.Error):
+            return {
+                "accepted": False,
+                "error": CredentialError(
+                    "MALFORMED", details={"hint": "key_b64 must be standard base64"}
+                ).as_dict(),
+            }
+        if len(key) != 32:
+            return {
+                "accepted": False,
+                "error": CredentialError(
+                    "MALFORMED", details={"key_bytes": len(key), "required": 32}
+                ).as_dict(),
+            }
+        if self._credentials is not None:
+            return {
+                "accepted": False,
+                "error": {
+                    "code": "CREDENTIAL_ALREADY_ENROLLED",
+                    "reason": "ALREADY_ENROLLED",
+                    "message": "a credential key is already enrolled for this run; enrollment is single-shot and fail-closed",
+                },
+            }
+        self._credentials = CredentialAuthority(key)
+        record_session_event(
+            self.store,
+            run_id=self.run_id,
+            event_type="credentials_enrolled",
+            payload={
+                "reason": "extension-enrolled session credential key (§11.4)",
+                "session_id": str(params.get("session") or self.run_id)[:128],
+            },
+        )
+        return {
+            "schema_version": "1.0.0",
+            "accepted": True,
+            "credentials": self._credentials.state(),
+        }
+
+    def credentials_deliver(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Vault one extension-minted child-bound token (§11.4/W7).
+
+        The extension mints the ``gate_a_submission`` token outside
+        model-reachable Python and delivers it here keyed by ``child_id``.
+        Stored tokens are never returned; overwrite of an unconsumed token is
+        refused with ``CREDENTIAL_ALREADY_DELIVERED``. ``evidence.gate_a``
+        consumes the vaulted token implicitly when the caller supplies only
+        ``child_id``.
+        """
+
+        from ayran.gates.credentials import CredentialError
+
+        child_id = str(params.get("child_id") or "")
+        # NB: the param is "credential", never "token" — the wire protocol
+        # reserves params.token for the run bearer (popped by AyranServer).
+        token = str(params.get("credential") or "")
+        if self._credentials is None:
+            return {
+                "accepted": False,
+                "error": CredentialError(
+                    "UNENROLLED", details={"hint": "credentials.enroll first"}
+                ).as_dict(),
+            }
+        if not child_id or not token:
+            return {
+                "accepted": False,
+                "error": CredentialError(
+                    "MALFORMED", details={"required": ["child_id", "token"]}
+                ).as_dict(),
+            }
+        try:
+            # Structural pre-verification (no consumption): signature, TTL and
+            # child binding must already hold at delivery time.
+            payload = self._credentials.verify(token, grant="gate_a_submission")
+        except CredentialError as error:
+            return {"accepted": False, "error": error.as_dict()}
+        delivered_child = str(payload.get("child_id") or "")
+        if delivered_child != child_id:
+            return {
+                "accepted": False,
+                "error": CredentialError(
+                    "BOUND_ID_MISMATCH", details={"required": child_id}
+                ).as_dict(),
+            }
+        if child_id in self._delivered_credentials:
+            return {
+                "accepted": False,
+                "error": {
+                    "code": "CREDENTIAL_ALREADY_DELIVERED",
+                    "reason": "ALREADY_DELIVERED",
+                    "message": "an unconsumed credential is already vaulted for this child_id",
+                },
+            }
+        self._delivered_credentials[child_id] = token
+        record_session_event(
+            self.store,
+            run_id=self.run_id,
+            event_type="credentials_delivered",
+            payload={
+                "reason": f"extension-minted challenger credential vaulted for rlm:{child_id}",
+                "session_id": str(params.get("session") or self.run_id)[:128],
+            },
+        )
+        return {"schema_version": "1.0.0", "accepted": True, "child_id": child_id}
+
+    def evidence_attach(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Thin model→evidence binding verb (§7.1 ``attach_evidence``).
+
+        Stores the artifact bytes through the existing :class:`ArtifactStore`
+        and appends one ``evidence-artifact`` graph node linking the hypothesis
+        via ``supports`` — the same storage format every adapter already uses;
+        no new format, no elevation (grade stays ``lead``: an attached artifact
+        is a claim, not an executed observation).
+        """
+
+        from ayran.api.validators import validate_contract
+        from ayran.evidence.errors import HYPOTHESIS_NOT_FOUND, SUBMISSION_INVALID, EvidenceError
+        from ayran.evidence.load import load_hypothesis
+        from ayran.graph.canonical import object_hash, utc_now
+        from ayran.graph.ids import new_id
+        from ayran.graph.types import AppendCommand, AppendItem
+        from ayran.tools.types import ADAPTER_VERSION, ZERO_HASH
+
+        self._require_write(params)
+        hypothesis_id = str(params.get("hypothesis_id") or "")
+        artifact = params.get("artifact")
+        kind = str(params.get("kind") or "text").lower()
+        session = str(params.get("session") or self.run_id)
+        try:
+            if hypothesis_id and load_hypothesis(self.store, hypothesis_id) is None:
+                raise EvidenceError(
+                    HYPOTHESIS_NOT_FOUND, f"hypothesis {hypothesis_id} was not found"
+                )
+            if not isinstance(artifact, (str, bytes)) or not artifact:
+                raise EvidenceError(
+                    SUBMISSION_INVALID, "evidence.attach requires a non-empty artifact payload"
+                )
+            payload = artifact.encode("utf-8") if isinstance(artifact, str) else artifact
+            media_type = {
+                "text": "text/plain",
+                "json": "application/json",
+                "markdown": "text/markdown",
+            }.get(kind, "application/octet-stream")
+            stored = self.artifact_store.store(
+                payload, media_type=media_type, source=f"attach:{hypothesis_id or 'session'}"
+            )
+            digest = str(stored["content_hash"])
+            writer, _session = self._derive_writer(params)
+            identity = self.store.stream.get("target_identity")
+            target_identity = dict(identity) if isinstance(identity, dict) else {
+                "target_id": "tgt_01J00000000000000000000001",
+                "source_tree_hash": ZERO_HASH,
+                "scope_id": "scp_01J00000000000000000000001",
+            }
+            created = utc_now()
+            evidence: dict[str, Any] = {
+                "schema_version": "1.0.0",
+                "evidence_id": new_id("evd"),
+                "created_at": created,
+                "run_id": self.run_id,
+                "target_identity": target_identity,
+                "artifact_hash": digest,
+                "size_bytes": int(stored["size_bytes"]),
+                "mime_type": media_type,
+                "producer": {"kind": writer["kind"] or "model", "id": str(writer["id"] or f"prime:{session}").lower(), "version": ADAPTER_VERSION},
+                "producer_version": ADAPTER_VERSION,
+                "input_hashes": [digest],
+                "config_hash": ZERO_HASH,
+                "fork_identity_hash": None,
+                "raw_locator": f"artifacts/{digest.removeprefix('sha256:')}",
+                "normalized_locator": f"artifacts/{digest.removeprefix('sha256:')}",
+                "evidence_grade": "lead",
+                "trust_class": "model_observation",
+                "confidence": 1.0,
+                "supports": [hypothesis_id] if hypothesis_id else [],
+                "refutes": [],
+                "redaction": {"profile": "default", "secret_scan_passed": True, "redacted": False},
+                "reproduction": {
+                    "argv": ["evidence.attach"],
+                    "working_root": str(self.run_root),
+                    "environment_hash": ZERO_HASH,
+                    "expected_result_hash": digest,
+                },
+                "provenance": [
+                    {
+                        "provenance_id": new_id("prv"),
+                        "source_uri": f"urn:ayran:attach:{hypothesis_id or session}",
+                        "source_version": "1.0.0",
+                        "raw_hash": digest,
+                        "retrieved_at": created,
+                        "license_or_terms": "engagement-local",
+                        "transformation_lineage": [],
+                    }
+                ],
+                "integrity": {
+                    "algorithm": "sha256",
+                    "canonicalization": "rfc8785",
+                    "content_hash": ZERO_HASH,
+                    "excluded_fields": ["integrity.content_hash"],
+                },
+            }
+            evidence["integrity"]["content_hash"] = object_hash(evidence)
+            validate_contract("evidence-artifact", evidence)
+            command = AppendCommand(
+                f"evidence-attach:{evidence['evidence_id']}",
+                (AppendItem("evidence-artifact@1.0.0", "evidence_artifact.recorded", evidence),),
+                {str(evidence["evidence_id"]): 0},
+                {"kind": writer["kind"] or "model", "id": str(writer["id"] or f"prime:{session}").lower(), "version": "1.0.0"},
+                ZERO_HASH,
+                ADAPTER_VERSION,
+                created_at=created,
+            )
+            acknowledgement = self.store.append(command)
+            return {
+                "schema_version": "1.0.0",
+                "accepted": True,
+                "evidence_id": str(evidence["evidence_id"]),
+                "hypothesis_id": hypothesis_id,
+                "sha256": digest,
+                "evidence_grade": "lead",
+                "acknowledgement": acknowledgement,
+            }
+        except EvidenceError as error:
+            self._journal_denial(
+                "evidence_attach_denied",
                 session_id=str(params.get("session") or self.run_id),
                 reason=f"{error.code}: {error.message}",
             )
@@ -852,12 +1199,26 @@ class BridgeDispatcher:
         filters = params.get("filter")
         if not isinstance(filters, dict):
             filters = {}
+        # Free-text query (§7.1 search_precedents): case-insensitive substring
+        # over the corpus records' text fields — ingested corpus ONLY; the live
+        # Solodit POST stays operator-sanctioned-only.
+        raw_query = str(params.get("query") or "").strip()
         try:
-            return query_records(
+            result = query_records(
                 self._knowledge_root(params),
                 record_type=str(params.get("type") or params.get("record_type") or "") or None,
                 filters=filters,
             )
+            if raw_query:
+                needle = raw_query.lower()
+                text_fields = ("title", "summary", "mechanism", "protocol", "component", "citation")
+                records = [
+                    record
+                    for record in result["records"]
+                    if any(needle in str(record.get(field) or "").lower() for field in text_fields)
+                ]
+                result = {**result, "records": records, "count": len(records), "query": raw_query}
+            return result
         except KnowledgeError as error:
             return error.as_result()
 
@@ -1151,6 +1512,13 @@ class BridgeDispatcher:
             return error.as_result()
 
     def authorize(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Boundary decision for one Prime tool call (§7.2 row 1).
+
+        Native tool flow: approved calls are NOT intercepted — the response
+        carries only ``permitted`` and optional ``reason`` so the stock Prime
+        tool_call hook proceeds locally on approval; deny still wins. The
+        routed-JSON detour is retired (the skill client speaks RPC directly).
+        """
         tool_name = str(params.get("tool_name") or "")
         arguments = params.get("arguments")
         if not isinstance(arguments, dict):
@@ -1160,12 +1528,10 @@ class BridgeDispatcher:
             and self.scope.allowed_tools
             and tool_name
             and tool_name not in self.scope.allowed_tools
-            and tool_name not in AYRAN_TOOLS
         ):
             return {
                 "permitted": False,
                 "reason": f"tool {tool_name!r} is not in the scope allowed_tools list",
-                "routed": False,
                 "action": tool_name,
                 "resource": ".",
             }
@@ -1178,34 +1544,29 @@ class BridgeDispatcher:
             return {
                 "permitted": True,
                 "reason": "unmapped tool pass-through",
-                "routed": False,
                 "action": action,
                 "resource": resource,
                 "authority": "pass_through",
             }
         decision = self.policy.authorize(action, resource=resource)
-        routed = tool_name in AYRAN_TOOLS
-        payload: dict[str, Any] = {
+        if not decision.permitted:
+            reason = _denial_reason(decision)
+            self._journal_policy_denial(
+                request_type="tool_call",
+                action=action,
+                resource=resource,
+                reason=reason,
+                tool_name=tool_name,
+            )
+        else:
+            reason = str(decision.reason)
+        return {
             "permitted": decision.permitted,
-            "reason": decision.reason,
-            "routed": routed,
+            "reason": reason,
             "action": action,
             "resource": resource,
             "authority": decision.authority.name.lower(),
         }
-        if routed and decision.permitted:
-            payload["sidecar_result"] = self._route_ayran_tool(tool_name, arguments)
-        return payload
-
-    def _route_ayran_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
-        if tool_name == "ayran.graph_query":
-            return self.graph_query(arguments)
-        if tool_name == "ayran.artifact_store":
-            digest = arguments.get("content_hash")
-            if isinstance(digest, str):
-                return self.artifact_store.verify(digest)
-            raise GraphError("CONTRACT_INVALID", "artifact_store requires content_hash")
-        raise LookupError(tool_name)
 
     def lifecycle_record(self, params: dict[str, Any]) -> dict[str, Any]:
         event_type = str(params.get("event_type") or "unknown")
@@ -1408,6 +1769,7 @@ def build_dispatcher(
     state_root: Path,
     run_root: Path,
     shutdown_callback: Callable[[], None] | None = None,
+    credentials: CredentialAuthority | None = None,
 ) -> BridgeDispatcher:
     scope = load_run_scope(run_root)
     policy = PolicyEngine(scope, config=config)
@@ -1424,6 +1786,7 @@ def build_dispatcher(
         state_root=state_root,
         run_root=run_root,
         shutdown_callback=shutdown_callback,
+        _credentials=credentials,
     )
     # §11.2: isolation verification runs at startup; failure is fail-closed for
     # cognitive verbs (they re-check before the first cognitive call).

@@ -3,34 +3,28 @@
 This module lives in ``src`` but NEVER spawns agents and NEVER calls ``rlm()``
 itself: the Prime ``rlm()`` invocation arrives through an injected transport
 callable (the live adapter is supplied by the root skill at runtime; CI uses a
-scripted transport). The sidecar side of the exchange — credential minting,
-verification, single-use revocation — also lives here so both ends share one
-implementation. SO_PEERCRED alone is insufficient (§11.4), so every challenger
-submission additionally presents a short-TTL, child-bound, single-use
-credential minted through :class:`CredentialAuthority`.
+scripted transport). Credential minting/verification moved to
+:mod:`ayran.gates.credentials` (§11.4 relocation): key generation lives only
+in the extension, the sidecar verifies/consumes against the enrolled key, and
+per-spawn challenger tokens are minted by the extension and vaulted
+server-side — the model never handles a challenger token. SO_PEERCRED alone
+is insufficient (§11.4), so every challenger submission additionally presents
+a short-TTL, child-bound, single-use credential verified through
+:class:`~ayran.gates.credentials.CredentialAuthority`.
 """
 
 from __future__ import annotations
 
-import base64
 import contextlib
 import hashlib
-import hmac
 import json
 import os
-import secrets
 import subprocess
 import sys
-import time
-from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-CREDENTIAL_GRANT_REMEMBER = "hypotheses.remember"
-CREDENTIAL_GRANT_GATE_A = "gate_a_submission"
-DEFAULT_TTL_SECONDS = 300.0
-
-CLOCK = Callable[[], float]
+from ayran.gates.credentials import CredentialAuthority
 
 # Node types whose ids/narrative must NEVER reach the challenger bundle (§5.5).
 HISTORICAL_NODE_TYPES = frozenset({"MechanismCard", "IncidentCard", "ReasoningLens"})
@@ -84,169 +78,6 @@ else:
     }
 json.dump(verdict, sys.stdout)
 """
-
-
-class CredentialError(ValueError):
-    """Stable refusal reason for a challenger/session credential."""
-
-    def __init__(self, reason: str, details: dict[str, Any] | None = None) -> None:
-        super().__init__(reason)
-        self.reason = reason
-        self.details = details or {}
-
-    def as_dict(self) -> dict[str, Any]:
-        value: dict[str, Any] = {"code": f"CREDENTIAL_{self.reason}", "reason": self.reason}
-        if self.details:
-            value["details"] = self.details
-        return value
-
-
-def _b64encode(payload: bytes) -> str:
-    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
-
-
-def _b64decode(body: str) -> bytes:
-    padding = "=" * (-len(body) % 4)
-    return base64.urlsafe_b64decode(body + padding)
-
-
-class CredentialAuthority:
-    """Short-TTL, identity-bound, single-use credentials (§11.4).
-
-    Tokens are HMAC-SHA256 signed compact JSON. ``verify(consume=True)`` enforces
-    the exactly-one-submission grant and is called at the verdict seal; the token
-    is dead afterwards (reuse is refused). ``revoke`` retires a token early.
-    """
-
-    def __init__(
-        self,
-        key: bytes | None = None,
-        *,
-        ttl_seconds: float = DEFAULT_TTL_SECONDS,
-        clock: CLOCK | None = None,
-    ) -> None:
-        self._key = key or secrets.token_bytes(32)
-        self.ttl_seconds = float(ttl_seconds)
-        self._clock: CLOCK = clock or time.time
-        self._used: set[str] = set()
-        self._revoked: set[str] = set()
-
-    def mint(
-        self,
-        *,
-        grants: tuple[str, ...] | list[str],
-        writer: Mapping[str, str] | None = None,
-        child_id: str | None = None,
-        session: str | None = None,
-        ttl_seconds: float | None = None,
-    ) -> str:
-        now = self._clock()
-        lifetime = self.ttl_seconds if ttl_seconds is None else float(ttl_seconds)
-        payload = {
-            "jti": secrets.token_hex(8),
-            "iat": now,
-            "exp": now + lifetime,
-            "grants": sorted(str(grant) for grant in grants),
-            "writer": dict(writer) if writer else None,
-            "child_id": str(child_id) if child_id else None,
-            "session": str(session) if session else None,
-        }
-        body = _b64encode(
-            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        )
-        signature = hmac.new(self._key, body.encode("ascii"), hashlib.sha256).hexdigest()
-        return f"{body}.{signature}"
-
-    def verify(
-        self,
-        token: str,
-        *,
-        grant: str | None = None,
-        child_id: str | None = None,
-        consume: bool = False,
-    ) -> dict[str, Any]:
-        if not isinstance(token, str) or token.count(".") != 1:
-            raise CredentialError("MALFORMED", details={"token_type": type(token).__name__})
-        body, signature = token.split(".", 1)
-        expected = hmac.new(self._key, body.encode("ascii"), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signature, expected):
-            raise CredentialError("SIGNATURE_INVALID")
-        try:
-            payload = json.loads(_b64decode(body))
-        except (ValueError, UnicodeError) as error:
-            raise CredentialError("MALFORMED", details={"parse": str(error)}) from error
-        if not isinstance(payload, dict):
-            raise CredentialError("MALFORMED")
-        jti = str(payload.get("jti") or "")
-        if not jti:
-            raise CredentialError("MALFORMED")
-        if jti in self._revoked:
-            raise CredentialError("REVOKED", details={"jti": jti})
-        if self._clock() >= float(payload.get("exp") or 0.0):
-            raise CredentialError("EXPIRED", details={"jti": jti})
-        if jti in self._used:
-            # Single-use grant: reuse after the verdict seal is refused (§11.4).
-            raise CredentialError("REVOKED", details={"jti": jti, "reuse": True})
-        grants = {str(item) for item in (payload.get("grants") or [])}
-        if grant is not None and grant not in grants:
-            raise CredentialError("GRANT_MISMATCH", details={"required": grant, "grants": sorted(grants)})
-        if child_id is not None and str(payload.get("child_id") or "") != child_id:
-            raise CredentialError("BOUND_ID_MISMATCH", details={"required": child_id})
-        if consume:
-            self._used.add(jti)
-        return payload
-
-    def revoke(self, token: str) -> None:
-        try:
-            body = token.split(".", 1)[0]
-            payload = json.loads(_b64decode(body))
-            jti = str(payload.get("jti") or "")
-        except (IndexError, ValueError, UnicodeError):
-            return
-        if jti:
-            self._revoked.add(jti)
-
-    def consume(self, token: str) -> None:
-        """Retire the token's single grant — called at the verdict seal (§11.4)."""
-
-        payload = self.verify(token)
-        jti = str(payload.get("jti") or "")
-        if jti:
-            self._used.add(jti)
-
-    def mint_session_writer(
-        self,
-        *,
-        session: str,
-        writer_kind: str,
-        writer_id: str,
-        ttl_seconds: float | None = None,
-    ) -> str:
-        return self.mint(
-            grants=(CREDENTIAL_GRANT_REMEMBER,),
-            writer={"kind": writer_kind, "id": writer_id},
-            session=session,
-            ttl_seconds=ttl_seconds,
-        )
-
-    def mint_challenger(
-        self,
-        *,
-        child_id: str,
-        ttl_seconds: float | None = None,
-    ) -> str:
-        return self.mint(
-            grants=(CREDENTIAL_GRANT_GATE_A,),
-            child_id=child_id,
-            ttl_seconds=ttl_seconds,
-        )
-
-    def state(self) -> dict[str, Any]:
-        return {
-            "ttl_seconds": self.ttl_seconds,
-            "used_credentials": len(self._used),
-            "revoked_credentials": len(self._revoked),
-        }
 
 
 # --- blind challenger bundle (claim + target slice ONLY, §5.5) -----------------
@@ -434,8 +265,8 @@ class ChallengerTransport:
 
 class HeadlessChallengerTransport(ChallengerTransport):
     """Degraded fallback (§11.2): a separate short-lived headless session whose
-    verbs reduce to read-only target access via an operator-provided path
-    copy. Same subprocess seam; different declared channel and verb set."""
+    verbs reduce to read-only target access via an operator-provided path copy.
+    Same subprocess seam; different declared channel and verb set."""
 
     channel = "headless_session"
 
@@ -502,7 +333,10 @@ def spawn_challenger(
     NEVER calls ``rlm()`` or spawns agents itself: the challenger runs inside
     the supplied transport (a real subprocess here; the live Prime ``rlm()``
     adapter is injected by the root skill at runtime). The submission lands in
-    sidecar ``evidence.gate_a`` under the per-spawn credential.
+    sidecar ``evidence.gate_a`` under the per-spawn credential minted here by
+    the CALLER's authority (live flow: the extension mints and vaults the
+    child token; this library seam serves CI and headless harnesses that act
+    as the enrollment client).
     """
 
     bundle = build_challenger_bundle(store, hypothesis_id)

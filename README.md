@@ -27,7 +27,7 @@ Using a plain AI agent for smart-contract auditing creates several structural pr
 
 **Tool output without validation discipline.** An agent might run Slither and report every alert as a finding. Ayran enforces evidence ceilings — Slither alerts become `lead` (a starting point, not a conclusion), while only independently replayable Foundry observations earn `observed` status. A lead can never enter the validation gates. Every candidate finding must pass a knowledge-blind attacker review (Gate A) and a causal falsification review (Gate B) before it can appear in a report.
 
-**Anchoring on known patterns.** Agents tend to find the bugs they've seen before, missing novel attack paths. Ayran protects against this with a mandatory target-first discovery phase, blind-vs-aware review separation, and six independently budgeted hypothesis drivers that prevent any single approach from monopolizing the search.
+**Anchoring on known patterns.** Agents tend to find the bugs they've seen before, missing novel attack paths. Ayran protects against this with a mandatory target-first discovery phase, blind-vs-aware review separation, and six independently budgeted advisory lenses that prevent any single approach from monopolizing the search while the model authors hypotheses itself via `remember`.
 
 **No organizational memory across protocols.** Ayran's three-namespace graph separates engagement-specific state (Target Graph, pinned to one protocol folder so mapping survives `/quit` and a new `--ayran` chat) from curated methodology knowledge (Global Graph) from lessons learned across engagements (Learning Graph). Learning promotions are human-reviewed, contamination-checked, and atomically reversible.
 
@@ -39,11 +39,28 @@ Using a plain AI agent for smart-contract auditing creates several structural pr
 
 Ayran is a package that layers onto a stock Prime-Agent installation without modifying it. It consists of three components working together:
 
-**1. Prime extension (TypeScript)** — the bridge. Prime discovers Ayran as a package. After `/ayran:activate`, the extension injects a bounded, labeled context pack into the model's context. It gates tool calls through sidecar policy, injects checkpoint state after compaction, and exposes `/ayran:*` slash commands.
+**1. Prime extension (TypeScript)** — the bridge. Prime discovers Ayran as a package. After `/ayran:activate`, the extension injects a bounded, labeled context pack into the model's context. Native Prime tool calls flow through stock Prime; the extension enforces scope silently at the pre-execution hook (deny still wins, no routed JSON). It exposes four slash commands (`/ayran:activate`, `/ayran:status`, `/ayran:doctor`, `/ayran:stop`), a ten-verb skill catalog, and extension-side credential minting.
 
 **2. Sidecar engine (Python)** — the brain. A per-run Unix-domain-socket JSON-RPC server that owns the journal, database projections, policy engine, tool adapters, context compiler, event router, evidence pipeline, knowledge corpus, and promotion pipeline. Only the sidecar writes to canonical state; the extension is a client.
 
 **3. Graph Fabric** — the memory. Three isolated namespaces sharing one journal format: Target (one protocol folder, durable across Prime sessions), Global (curated methodology knowledge, immutable releases), and Learning (quarantined cross-engagement lessons, human-reviewed promotion). Journals live on WSL2 ext4.
+
+### Skill verb catalog
+
+The model's working interface is ten verbs in `ayran.skill.verbs`, 1:1 with sidecar RPC handlers. Discovery is env-paths-only (`AYRAN_SOCKET_PATH`, `AYRAN_TOKEN_FILE`). Authorization stays at the RPC boundary; these verbs add none.
+
+| Verb | Signature | Purpose | RPC | Returns |
+|------|-----------|---------|-----|---------|
+| `map_target` | `map_target(force: bool = False)` | Build/refresh the attack-surface map and compile the enriched pack. | `maps.build` → `coverage.summary` → `context.compile` | `{schema_version, maps, coverage, pack}` or a denial |
+| `scan` | `scan(adapter, input, timeout=None)` | Run one registered adapter supervised. Findings are leads. | `tools.run` | adapter result (ceiling `lead`) |
+| `search_precedents` | `search_precedents(query, filters=None, limit=None)` | Ground hypotheses in **ingested** corpus only. Live Solodit POST remains operator-sanctioned-only. | `knowledge.query` | `{records, count, ...}` (limit trims records) |
+| `remember` | `remember(*, origin, claim, attack_path, preconditions, cluster_id=None, **rest)` | Author a hypothesis. The only model→graph write path for reasoning content; writer identity is bound server-side. | `hypotheses.remember` | `{accepted, hypothesis_id, writer, ...}` |
+| `attach_evidence` | `attach_evidence(hypothesis_id, artifact, kind="text")` | Bind one artifact to a hypothesis (grade stays `lead`). | `evidence.attach` | attach result |
+| `spawn_challenger` | `spawn_challenger(hypothesis_id, *, child_id=None, transport=None, credentials=None, session=None)` | Gate A prep: blind bundle; extension mints; model never handles a challenger token. | `challenger.prepare` + `credentials.deliver` | `{credential_minter, bundle, verdict, ...}` or a denial |
+| `request_gate_a` | `request_gate_a(hypothesis_id, *, submission, child_id, transcript_hash=None, reconcile=False)` | Submit the challenger verdict; sidecar consumes the vaulted token at seal. | `evidence.gate_a` | sealed verdict / record |
+| `request_gate_b` | `request_gate_b(hypothesis_id, poc_id=None, **rest)` | Executed-artifact post-PoC falsification. Asserted booleans are forgery. | `evidence.gate_b` | Gate B verdict |
+| `coverage` | `coverage(cluster_id=None)` | Coverage posture (grid summary + census). | `coverage.summary` (`coverage.cell` for detail) | summary census |
+| `report` | `report(hypothesis_id, template=None)` | Render a submission draft. Nothing is sent anywhere. | `finding.build` → `report.render` → `report.lint` | `{schema_version, finding, report, lint}` |
 
 ---
 
@@ -72,18 +89,18 @@ These maps populate the Target Graph. The model never sees them directly — it 
 
 For each contract or cluster, a coverage grid tracks risk-weighted cells: entry points, state variables, invariants, external interactions, temporal behaviors, value flows, and integration boundaries. Each cell moves from `unexamined` through `in_progress` to `examined_no_issue`, `blocked`, `lead_found`, `hypothesis_active`, `validated`, or `residual_risk`. A cell can only move forward without explicit invalidation. This tells the router where attention is needed next.
 
-### 4. Hypothesis generation: six drivers working in parallel
+### 4. Hypothesis generation: six advisory lenses, model-authored claims
 
-The router dispatches six independent hypothesis drivers, each with its own budget out of 100 units per run tranche:
+The router no longer fabricates hypotheses. It emits `LensUpdate` actions over six advisory lenses (budgets still 25/15/15/10/15/20). The model authors claims itself via `remember`:
 
-| # | Driver | Origin | Budget | What it does |
-|---|--------|--------|--------|-------------|
-| 1 | Model-native | `model_novel` | 25 (protected) | First-principles attack reasoning without any external history. This is the mandatory target-first pass — it cannot be skipped and its budget cannot be reassigned until every high-value state cluster is covered. |
-| 2 | Global Graph | `global_graph` | 15 | Retrieves relevant mechanism cards, incident precedents, and attack patterns from the curated knowledge corpus. These are labeled `HISTORICAL_REFERENCE` to prevent anchoring. |
-| 3 | Contradiction | `contradiction` | 15 | Detects conflicting assertions, spec/code divergence, inconsistent formulas/units, and tool/model disagreements. Turns each contradiction into a testable hypothesis. |
-| 4 | Tool-derived | `tool` | 10 | Converts tool output (Slither alerts, Foundry test results, compiler warnings) into hypotheses. Tool output starts at `lead` evidence ceiling. |
-| 5 | Coverage | `coverage` | 15 | Drives the risk-weighted coverage grid — ensures every high-value entry point, state variable, and integration boundary receives bounded attention. |
-| 6 | Adversarial specialist | `specialist` | 20 | Domain-specific deep dives: access/trust, accounting, math/economic, integration/oracle/token, temporal/MEV. Can run knowledge-blind or graph-aware depending on the risk profile. |
+| # | Lens | Origin label | Budget | What it surfaces |
+|---|------|--------------|--------|------------------|
+| 1 | `first_principles` | `model_novel` | 25 (protected) | First-principles attack reasoning without external history. Mandatory target-first pass; budget cannot be reassigned until every high-value state cluster is covered. |
+| 2 | `precedent` | `global_graph` | 15 | Applicable known mechanisms, incident precedents, and attack patterns, labeled historical reference (guidance, not proof). |
+| 3 | `contradiction` | `contradiction` | 15 | Conflicting assertions, spec/code splits, inconsistent formulas/units, tool/model disagreements. |
+| 4 | `tool_signal` | `tool` | 10 | Compiler, static, and test leads (ceiling `lead`). |
+| 5 | `coverage` | `coverage` | 15 | Untried dimensions and sibling paths on the risk-weighted coverage grid. |
+| 6 | `specialist` | `specialist` | 20 | Spawned role reviews (`rlm()`, depth default 1). |
 
 The router enforces budget conservation. Hypothesis deduplication happens at the canonical level: same root cause + affected state + attacker path = duplicate. Nothing is silently merged or deleted.
 
@@ -150,9 +167,9 @@ The Global Graph is populated from curated snapshots. These are NOT live fetches
 
 **Krait** — the richest knowledge source. Its attack angles, detector modules, kill-gate logic, candidate-proof-critic separation, impact/falsification methodology, and output schemas are ingested as machine-readable reasoning lenses and methodology records. Some design choices were informed by Krait's candidate/proof/critic/kill-gate pattern at the conceptual level only; there is no code lineage — the M1 journal, M5 router, and M6 gates are original implementations. All Krait records carry provenance (commit hash, trust tier) and its self-reported scores are NEVER treated as evidence. Its scheduler is never run.
 
-**0xsimao** — all twelve accounting lenses (desynchronization, shares/exchange-rates, cohorts, liquidation/solvency, cross-chain state, rounding, ordering/MEV, DoS, access/trust, integration assumptions, edge states, flow completeness) ingested as first-class reasoning lenses in the Global Graph. The accounting specialist driver uses these directly during hypothesis generation.
+**0xsimao** — all twelve accounting lenses (desynchronization, shares/exchange-rates, cohorts, liquidation/solvency, cross-chain state, rounding, ordering/MEV, DoS, access/trust, integration assumptions, edge states, flow completeness) ingested as first-class reasoning lenses in the Global Graph. The accounting specialist lens uses these as advisory context; the model still authors hypotheses via `remember`.
 
-**ZeroSkills** — five specialist skill definitions (storage layout, Vyper, symmetry/path comparison, Uniswap v4 hooks, test-suite analysis) ingested as specialist role records. The M5 router uses these to dispatch domain-specific hypothesis drivers.
+**ZeroSkills** — five specialist skill definitions (storage layout, Vyper, symmetry/path comparison, Uniswap v4 hooks, test-suite analysis) ingested as specialist role records. They feed the specialist advisory lens and spawned role reviews; they do not auto-author hypotheses.
 
 **Solodit** — two contributions: (a) the M4 adapter calls the Solodit API to search known findings during an audit (rate-limited, privacy-filtered, ceiling: lead), and (b) historical incident records (beanstalk-2022, cream-2021, euler-2023, nomad-2022, harvest-2020, compound-empty) are ingested into the Global Graph with root cause separated from symptoms and full citation metadata. These incident cards supply the evaluation fixtures and serve as anchor-resistant historical references.
 

@@ -2,7 +2,9 @@
 
 Specialists hold ZERO sidecar-write verbs: outputs return over the spawning
 root's channel. The Gate A challenger keeps exactly one grant —
-``gate_a_submission`` — minted by CredentialAuthority.mint_challenger.
+``gate_a_submission`` — minted by CredentialAuthority.mint_challenger
+(:mod:`ayran.gates.credentials`; since the §11.4 relocation the extension
+mints challenger tokens and vaults them server-side).
 """
 
 from __future__ import annotations

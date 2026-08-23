@@ -647,7 +647,7 @@ def gate_a(
     before any reconciliation attaches.
     """
 
-    from ayran.gates.spawn_challenger import CREDENTIAL_GRANT_GATE_A, CredentialError
+    from ayran.gates.credentials import CREDENTIAL_GRANT_GATE_A, CredentialError
 
     hypothesis = _require_hypothesis(store, hypothesis_id)
     if isinstance(analysis, dict) and ("verdict" in analysis or "proposed_verdict" in analysis):
@@ -711,7 +711,7 @@ def gate_a(
             )
         if authority is None:
             # Fail closed: a fresh unknown-key authority refuses every token.
-            from ayran.gates.spawn_challenger import CredentialAuthority
+            from ayran.gates.credentials import CredentialAuthority
 
             authority = CredentialAuthority()
         try:

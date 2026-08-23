@@ -1,10 +1,10 @@
 import { detectKernel, type RuntimeState } from "./bootstrap.ts";
+import { deliverChildCredential } from "./credentials.ts";
 import {
   ensureSidecar,
   resolveScopeManifest,
   stopSpawnedSidecar,
 } from "./launch.ts";
-import { ipythonBlockReason } from "./policy-gate.ts";
 import type {
   CustomMessage,
   ExtensionAPI,
@@ -200,7 +200,10 @@ export function registerHooks(
   });
 
   on("resources_discover", async () => {
-    return undefined;
+    // Stock Prime 0.7.2 contract expects an object (skillPaths?/promptPaths?/
+    // themePaths?), not undefined; a well-formed empty catalog is the honest
+    // answer while Ayran surfaces its resources through skills, not here.
+    return {};
   });
 
   on("before_agent_start", async () => {
@@ -252,16 +255,17 @@ export function registerHooks(
     }
     const toolName = String(event.toolName ?? "");
     const input = asRecord(event.input);
-    if (toolName === "ipython") {
-      const reason = ipythonBlockReason(String(input.code ?? ""));
-      if (reason) {
-        runtime.telemetry.event("warn", "ayran.tool.ipython_blocked", {
-          outcome: "blocked",
-          warning: "not_a_sandbox",
-        });
-        return { block: true, reason };
-      }
-    }
+    // Native tool flow (§7.2 row 1): approved calls are never intercepted —
+    // they proceed through the stock Prime tool machinery; deny still wins.
+    // ipython payloads are NOT string-sniffed (§7.2 row 2): enforcement is
+    // the single-writer sidecar boundary + scope + verb ACLs at the RPC
+    // boundary. This hook itself contains no local-execution path.
+    //
+    // CONTINGENCY CLAUSE (§7.2): this ordering assumes the stock Prime 0.7.2+
+    // tool_call hook fires PRE-execution, so a denial below precedes any byte
+    // read or written. If live verification ever disproves PRE-execution
+    // ordering in a current or future Prime version, routed interception is
+    // reinstated for bash/write tools only (fail-closed).
     const decision = (await runtime.sidecar.tryCall("policy.authorize", {
       tool_name: toolName,
       arguments: input,
@@ -269,8 +273,6 @@ export function registerHooks(
       | {
           permitted?: boolean;
           reason?: string;
-          routed?: boolean;
-          sidecar_result?: unknown;
         }
       | undefined;
     if (decision === undefined) {
@@ -290,12 +292,6 @@ export function registerHooks(
         reason: decision.reason ?? "tool call denied by Ayran scope policy",
       };
     }
-    if (decision.routed) {
-      return {
-        block: true,
-        reason: `Routed through the Ayran sidecar (not executed locally): ${JSON.stringify(decision.sidecar_result ?? {})}`,
-      };
-    }
     return undefined;
   });
 
@@ -309,6 +305,11 @@ export function registerHooks(
     const handle = extractHandle(event.details) ?? extractHandle(event.content);
     if (handle) {
       await runtime.sidecar.tryCall("child.register", { handle });
+      // §11.4/W7: on observing a child, mint the child-bound
+      // gate_a_submission token extension-side and vault it server-side; the
+      // model never handles a challenger token.
+      const childId = String(handle.rlm_child_id ?? handle.child_id ?? "");
+      await deliverChildCredential(runtime, childId);
     }
     return undefined;
   });
@@ -327,12 +328,20 @@ export function registerHooks(
       });
     }
     if (message.customType === "rlm_child_terminal_notice") {
+      const handle =
+        extractHandle(message.details) ??
+        ({ rlm_child_id: String(message.content ?? "unknown") } as Record<
+          string,
+          unknown
+        >);
       await runtime.sidecar.tryCall("child.complete", {
-        handle: extractHandle(message.details) ?? {
-          rlm_child_id: String(message.content ?? "unknown"),
-        },
+        handle,
         result: { notice: true },
       });
+      // §11.4/W7 child observation point: keep a vaulted credential available
+      // for the child's Gate A submission path (best-effort, never blocking).
+      const childId = String(handle.rlm_child_id ?? handle.child_id ?? "");
+      await deliverChildCredential(runtime, childId);
     }
     return undefined;
   });

@@ -52,20 +52,22 @@ facts.
 
 Stay inside the in-scope paths named in the context pack. Denied tool calls come from the sidecar, not from a permission list in chat. Do not retry a denial with a rewritten path. Spending, signing, broadcasting, submissions, and scope expansion still require the operator.
 
-## Six driver hypotheses
+## Six advisory lenses
 
-Keep a portfolio of origins. The M5 router sequences six drivers; none is
-an exclusive list and all face the same target evidence ladder:
+Keep a portfolio of origins. The router emits `LensUpdate` actions over six
+advisory lenses; none is an exclusive list and all face the same target
+evidence ladder. The model authors hypotheses via `remember()` — there is
+no templated claim generator.
 
-1. **model_novel** — first-principles reasoning over this target.
-2. **global_graph** — applicable known mechanisms (guidance, not proof).
+1. **first_principles** (`model_novel`) — first-principles reasoning over this target.
+2. **precedent** (`global_graph`) — applicable known mechanisms (guidance, not proof).
 3. **contradiction** — invariants, conservation, and spec/code splits.
-4. **tool** — compiler, static, and test leads (leads only).
+4. **tool_signal** (`tool`) — compiler, static, and test leads (leads only).
 5. **coverage** — untried dimensions and sibling paths.
 6. **specialist** — spawned role reviews (`rlm()`, depth default 1).
 
-Do not implement these drivers yourself in this skill. The sidecar compiler
-injects labeled context; the router sequences structured hypotheses. Record
+Do not implement these lenses yourself in this skill. The sidecar compiler
+injects labeled context; the router sequences lens updates. Record
 distinguishable hypotheses; do not let one origin monopolize the queue.
 
 ## Evidence quality (conceptual)
@@ -113,9 +115,9 @@ an untested surface as safe; record examined vs untried dimensions.
    JSON) via `evidence.gate_b` — asserted booleans are forgery.
 5. **Report** only after validation. Report generation must not launch tools.
 
-Prefer `ayran.graph_query` / `ayran.artifact_store` (routed through the
-sidecar) over dumping journals into chat. Operator commands:
-`/ayran:status`, `/ayran:doctor`, `/ayran:stop`, `/ayran:recover`.
+Prefer the ten-verb skill catalog (`ayran.skill.verbs`; documented in the
+root README) over dumping journals into chat. Operator commands:
+`/ayran:activate`, `/ayran:status`, `/ayran:doctor`, `/ayran:stop`.
 
 Spawn specialists with Prime `rlm()` only from the root. The extension
 observes child handles; it never calls `rlm()` for you.

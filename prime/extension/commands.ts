@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "./prime-api.ts";
 import type { RuntimeState } from "./bootstrap.ts";
+import { enrollCredentials } from "./credentials.ts";
 import { ensureSidecar, resolveScopeManifest } from "./launch.ts";
 
 function formatResult(value: unknown): string {
@@ -38,6 +39,8 @@ export function registerCommands(
         });
         return;
       }
+      // §11.4/W7: enroll this session's credential key once the sidecar is up.
+      await enrollCredentials(runtime);
       if (runtime.scopeManifestPath) {
         const loaded = await runtime.sidecar.tryCall("scope.load", {
           manifest: runtime.scopeManifestPath,
@@ -66,9 +69,11 @@ export function registerCommands(
 
   pi.registerCommand("ayran:status", {
     description:
-      "Show sidecar status: graph health, active runs, and tool availability.",
+      "Show sidecar status: graph health, active runs, tool availability, and a recovery hint when the run looks interrupted.",
     handler: async (_args, ctx) => {
-      const result = await runtime.sidecar.tryCall("run.status");
+      const result = (await runtime.sidecar.tryCall("run.status")) as
+        | { run?: { interruptible?: boolean } }
+        | undefined;
       if (result === undefined) {
         notify(ctx, "Ayran sidecar unreachable.", "warning");
         runtime.telemetry.event("warn", "ayran.command.status.unreachable", {
@@ -77,6 +82,15 @@ export function registerCommands(
         return;
       }
       notify(ctx, formatResult(result), "info");
+      if (result.run?.interruptible) {
+        // /ayran:recover is retired (§7.2 row 3): recovery stays on the
+        // run.recover RPC and the `ayran recover` CLI, surfaced here.
+        notify(
+          ctx,
+          "This run looks interrupted (stale process records, no clean shutdown). Reclaim leases and verify the journal via the run.recover RPC or the CLI: ayran recover",
+          "warning",
+        );
+      }
     },
   });
 
@@ -109,18 +123,6 @@ export function registerCommands(
         return;
       }
       notify(ctx, formatResult({ stopped, shutdown }), "info");
-    },
-  });
-
-  pi.registerCommand("ayran:recover", {
-    description: "Recover a stale run: reclaim leases and verify the journal.",
-    handler: async (_args, ctx) => {
-      const result = await runtime.sidecar.tryCall("run.recover");
-      if (result === undefined) {
-        notify(ctx, "Ayran sidecar unreachable.", "warning");
-        return;
-      }
-      notify(ctx, formatResult(result), "info");
     },
   });
 }

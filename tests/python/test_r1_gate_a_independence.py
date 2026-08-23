@@ -12,6 +12,7 @@ owner-witnessed demo-of-done performed after verification.
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -26,9 +27,9 @@ from ayran.evidence.load import (
 )
 from ayran.evidence.persist import evidence_node, persist_runtime_node
 from ayran.evidence.service import remember, transition
+from ayran.gates.credentials import CredentialAuthority
 from ayran.gates.spawn_challenger import (
     ChallengerTransport,
-    CredentialAuthority,
     build_challenger_bundle,
     forbidden_leakage_tokens,
     leakage_scan,
@@ -479,13 +480,18 @@ def test_degraded_headless_mode_seals_transcript_hash(tmp_path: Path) -> None:
 
 
 def test_challenger_prepare_rpc_round_trip(tmp_path: Path) -> None:
-    """The root-skill transport seam over the RPC surface: challenger.prepare
-    mints the per-spawn credential and returns the blind bundle; the verdict
-    returns through evidence.gate_a under that credential."""
+    """Root-skill transport seam over RPC: challenger.prepare returns the
+    blind bundle (extension is the minter); the extension vaults the
+    child-bound token via credentials.deliver; evidence.gate_a omits the
+    credential and consumes the vault at seal. Equal-or-stronger than the
+    pre-R5 prepare-returns-credential flow: mint is extension-side, the
+    model never handles a challenger token, and vault consumption is
+    asserted on replay."""
 
     from test_r1_hypothesis_remember import MODEL_AUTHORED_CLAIM, _remember_params, _sidecar
 
     dispatcher, store = _sidecar(tmp_path / "prepare")
+    test_key = b"a-fixed-32-byte-test-key-aaaaaaa"
     try:
         created = dispatcher.dispatch("hypotheses.remember", _remember_params())
         assert created["accepted"] is True
@@ -500,31 +506,42 @@ def test_challenger_prepare_rpc_round_trip(tmp_path: Path) -> None:
             actor={"kind": "service", "id": "ayran.evidence", "version": "1.0.0"},
             cause="target-specific path and invariant",
         )
+        enrolled = dispatcher.dispatch(
+            "credentials.enroll",
+            {"key_b64": base64.b64encode(test_key).decode()},
+        )
+        assert enrolled["accepted"] is True
         prepared = dispatcher.dispatch(
             "challenger.prepare",
             {"hypothesis_id": str(created["hypothesis_id"]), "child_id": "child-91"},
         )
         assert prepared["schema_version"] == "1.0.0"
+        assert prepared["credential_minter"] == "extension"
         assert prepared["isolation"]["verified"] is True
         assert prepared["bundle"]["claim"] == MODEL_AUTHORED_CLAIM
-        token = str(prepared["credential"])
+        assert "credential" not in prepared
+        token = CredentialAuthority(test_key).mint_challenger(child_id="child-91")
+        delivered = dispatcher.dispatch(
+            "credentials.deliver",
+            {"child_id": "child-91", "credential": token},
+        )
+        assert delivered["accepted"] is True
         verdict = dispatcher.dispatch(
             "evidence.gate_a",
             {
                 "hypothesis_id": str(created["hypothesis_id"]),
                 "submission": dict(CHALLENGER_SUBMISSION_POC_WORTHY),
-                "credential": token,
+                "child_id": "child-91",
             },
         )
         assert verdict["verdict"] == "poc_worthy"
         assert verdict["record"]["reviewer"]["id"] == "rlm:child-91"
-        # The single grant is spent: a second submission on the same credential is denied.
         replay = dispatcher.dispatch(
             "evidence.gate_a",
             {
                 "hypothesis_id": str(created["hypothesis_id"]),
                 "submission": dict(CHALLENGER_SUBMISSION_POC_WORTHY),
-                "credential": token,
+                "child_id": "child-91",
             },
         )
         assert replay["accepted"] is False

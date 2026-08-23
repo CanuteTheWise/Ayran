@@ -3,7 +3,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { activate, createRuntime } from "../../prime/extension/index.ts";
+import {
+  activate,
+  createRuntime,
+  CredentialMinter,
+  enrollCredentials,
+} from "../../prime/extension/index.ts";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -191,7 +196,7 @@ test("degraded sidecar fail-closes mapped tool calls when armed", async () => {
   assert.equal(blocked[0]?.block, true);
 });
 
-test("ipython disallowed payloads are blocked with a not-a-sandbox warning", async () => {
+test("ipython payloads are not string-sniffed", async () => {
   const pi = mockPi();
   const runtime = createRuntime(root);
   runtime.sessionActive = true;
@@ -199,12 +204,11 @@ test("ipython disallowed payloads are blocked with a not-a-sandbox warning", asy
   runtime.autoStartSidecar = false;
   runtime.sidecar.tryCall = async () => ({ permitted: true, routed: false });
   activate(pi, root, runtime);
-  const blocked = (await pi.fire("tool_call", {
+  const result = (await pi.fire("tool_call", {
     toolName: "ipython",
     input: { code: "import subprocess\nsubprocess.run(['id'])" },
-  })) as Array<{ block?: boolean; reason?: string }>;
-  assert.equal(blocked[0]?.block, true);
-  assert.match(String(blocked[0]?.reason), /not a sandbox/i);
+  })) as Array<unknown>;
+  assert.equal(result[0], undefined);
 });
 
 test("policy gate rejects denied tools and passes allowed tools", async () => {
@@ -297,13 +301,13 @@ test("command surface is self-documenting", async () => {
     "ayran:status",
     "ayran:doctor",
     "ayran:stop",
-    "ayran:recover",
   ]) {
     const command = pi.commands.get(name);
     assert.ok(command, name);
     assert.ok(command.description && command.description.length > 8, name);
     await command.handler("", mockCtx());
   }
+  assert.equal(pi.commands.has("ayran:recover"), false);
 });
 
 test("repeated start and shutdown is clean ten times", async () => {
@@ -319,4 +323,104 @@ test("repeated start and shutdown is clean ten times", async () => {
     await pi.fire("session_shutdown", { reason: "quit" });
     assert.equal(runtime.closed, true);
   }
+});
+
+test("approved in-scope reads are never hijacked into routed JSON", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.sessionActive = true;
+  runtime.injectionActive = true;
+  runtime.autoStartSidecar = false;
+  runtime.sidecar.tryCall = async () => ({
+    permitted: true,
+    routed: true,
+    sidecar_result: { x: 1 },
+  });
+  activate(pi, root, runtime);
+  const result = (await pi.fire("tool_call", {
+    toolName: "read",
+    input: { path: "target/src/Vault.sol" },
+  })) as Array<unknown>;
+  assert.equal(result[0], undefined);
+});
+
+test("resources_discover resolves to a non-null object", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  activate(pi, root, runtime);
+  const result = await pi.fire("resources_discover");
+  assert.notEqual(result[0], null);
+  assert.equal(typeof result[0], "object");
+});
+
+test("activate triggers exactly one credentials.enroll with a 32-byte key", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.autoStartSidecar = false;
+  const enrolls: Array<Record<string, unknown>> = [];
+  let release!: () => void;
+  const sawEnroll = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  runtime.sidecar.tryCall = async (method, params = {}) => {
+    if (method === "credentials.enroll") {
+      enrolls.push(params);
+      release();
+      return { accepted: true };
+    }
+    return { ok: true };
+  };
+  activate(pi, root, runtime);
+  await sawEnroll;
+  assert.equal(enrolls.length, 1);
+  const key = Buffer.from(String(enrolls[0]?.key_b64 ?? ""), "base64");
+  assert.equal(key.length, 32);
+});
+
+test("a second enroll attempt is refused with CREDENTIAL_ALREADY_ENROLLED", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.autoStartSidecar = false;
+  runtime.sidecar.tryCall = async () => ({
+    accepted: false,
+    error: { code: "CREDENTIAL_ALREADY_ENROLLED" },
+  });
+  activate(pi, root, runtime);
+  const outcome = await enrollCredentials(runtime);
+  assert.equal(outcome.attempted, true);
+  assert.equal(outcome.accepted, false);
+  assert.equal(outcome.code, "CREDENTIAL_ALREADY_ENROLLED");
+});
+
+test("CredentialMinter.mint matches the wire regex and mintChallenger binds child_id", () => {
+  const minter = new CredentialMinter();
+  const token = minter.mint({ grants: ["hypotheses.remember"] });
+  assert.match(token, /^[\w-]+\.[0-9a-f]{64}$/);
+  const challenger = minter.mintChallenger("child-gate-a");
+  assert.match(challenger, /^[\w-]+\.[0-9a-f]{64}$/);
+  const body = challenger.split(".")[0] ?? "";
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
+    child_id?: string;
+    grants?: string[];
+  };
+  assert.equal(payload.child_id, "child-gate-a");
+  assert.deepEqual(payload.grants, ["gate_a_submission"]);
+});
+
+test("enrollCredentials is idempotent per runtime", async () => {
+  const pi = mockPi();
+  const runtime = createRuntime(root);
+  runtime.autoStartSidecar = false;
+  runtime.credentialsEnrolled = true;
+  let calls = 0;
+  runtime.sidecar.tryCall = async () => {
+    calls += 1;
+    return { accepted: true };
+  };
+  activate(pi, root, runtime);
+  const outcome = await enrollCredentials(runtime);
+  assert.equal(outcome.attempted, false);
+  assert.equal(outcome.accepted, true);
+  assert.equal(calls, 0);
+  void pi;
 });

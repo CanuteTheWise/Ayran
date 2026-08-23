@@ -58,7 +58,7 @@
     ]
   },
   "ayran": {
-    "milestone": "M9",
+    "milestone": "R5",
     "runtimeImplemented": true,
     "primeBoundary": "external-unmodified-peer",
     "canonicalContracts": "schemas/contracts.schema.json"

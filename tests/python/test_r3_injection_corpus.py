@@ -9,12 +9,12 @@ from ayran.context.compiler import compile_from_view
 from ayran.evidence.errors import INJECTION_QUARANTINED, EvidenceError
 from ayran.evidence.load import load_hypotheses, load_nodes_by_type, node_props
 from ayran.evidence.service import remember
-from ayran.gates.role_acls import ROLE_GRANTS, WRITE_VERBS
-from ayran.gates.spawn_challenger import (
+from ayran.gates.credentials import (
     CREDENTIAL_GRANT_GATE_A,
     CredentialAuthority,
     CredentialError,
 )
+from ayran.gates.role_acls import ROLE_GRANTS, WRITE_VERBS
 from ayran.hypotheses.builders import build_hypothesis
 from m5_fixtures import CLUSTER, CREATED, RUN_ID, TARGET_IDENTITY, base_view, open_store
 

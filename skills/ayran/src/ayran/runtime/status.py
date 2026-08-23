@@ -47,6 +47,13 @@ def reconstruct_status(config: Any, run_id: str, state_root: Path | None) -> dic
                         "pgid": last.get("pgid"),
                     }
                 )
+    run_state = receipt.get("run_state", "unknown")
+    # Additive derived flag (§7.2 row 3): conservative heuristic for "this run
+    # never shut down cleanly and still carries unreconciled process records"
+    # — the shape /ayran:status uses to surface the recovery hint. The
+    # authoritative stale/alive decision belongs to run.recover, which probes
+    # OS liveness; this projection reads durable state only.
+    interruptible = run_state not in {"stopped", "completed"} and bool(active)
     return {
         "schema_version": "1.0.0",
         "run_id": run_id,
@@ -59,5 +66,6 @@ def reconstruct_status(config: Any, run_id: str, state_root: Path | None) -> dic
         "pending_approvals": receipt.get("pending_approvals", []),
         "last_concrete_progress": receipt.get("last_concrete_progress"),
         "blockers": receipt.get("blockers", []),
-        "run_state": receipt.get("run_state", "unknown"),
+        "run_state": run_state,
+        "interruptible": interruptible,
     }
