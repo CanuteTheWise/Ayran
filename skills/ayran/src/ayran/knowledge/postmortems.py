@@ -131,6 +131,21 @@ def _looks_like_shell(text: str) -> bool:
     return len(text) < 200 and ("javascript" in lowered or "sign up" in lowered or "log in" in lowered)
 
 
+# Block-explorer hosts host transaction pages, not write-ups; fetching them
+# would be impolite load with zero analysis text. Skipped and counted.
+_EXPLORER_HOSTS = {
+    "bscscan.com", "www.bscscan.com", "etherscan.io", "optimistic.etherscan.io",
+    "polygonscan.com", "arbiscan.io", "basescan.org", "snowtrace.io",
+    "blastscan.io", "explorer.phalcon.xyz", "app.blocksec.com",
+    "phalcon.blocksec.com", "dashboard.tenderly.co",
+}
+
+
+def _host(url: str) -> str:
+    match = re.match(r"https?://([^/]+)", url, re.IGNORECASE)
+    return match.group(1).lower() if match else ""
+
+
 def fetch(url: str, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Fetch one write-up page. Never raises; always returns a status dict."""
 
@@ -203,6 +218,7 @@ def enrich(
         "paywall": 0,
         "x_wall": 0,
         "network_fail": 0,
+        "explorer_skipped": 0,
         "skipped_safety": 0,
         "other_fail": 0,
         "enriched_records": 0,
@@ -259,6 +275,9 @@ def enrich(
             existing_block = record.get("postmortem") or {}
             if existing_block.get("status") in {"ok", "paywall"} and existing_block.get("sha256"):
                 break
+            if _host(url) in _EXPLORER_HOSTS:
+                summary["explorer_skipped"] += 1
+                continue
             outcome = fetched_cache.get(url)
             if outcome is None:
                 outcome = fetch(url, timeout=timeout)
