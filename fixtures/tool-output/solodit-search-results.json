@@ -1,22 +1,25 @@
 {
-  "page": 1,
-  "next_cursor": "page-2",
-  "results": [
+  "findings": [
     {
-      "title": "Reentrancy in callback after external token transfer",
-      "severity": "high",
-      "category": "reentrancy",
-      "protocol": "generic-amm",
-      "source_url": "https://solodit.cyfrin.io/issues/example-reentrancy-001",
-      "record_id": "solodit-reentrancy-001"
-    },
-    {
-      "title": "Oracle price can be stale across a multi-block window",
-      "severity": "medium",
-      "category": "oracle",
-      "protocol": "generic-lending",
-      "source_url": "https://solodit.cyfrin.io/issues/example-oracle-002",
-      "record_id": "solodit-oracle-002"
+      "id": "FND-1001",
+      "slug": "euler-mint-manipulation",
+      "title": "Minting shares before the first deposit enables a donation inflation attack",
+      "content": "Full finding markdown would appear here in production responses.",
+      "summary": "First-depositor share-price manipulation drains subsequent deposits.",
+      "impact": "High",
+      "report_date": "2023-06-12",
+      "firm_name": "Omni",
+      "protocol_name": "Euler",
+      "quality_score": 4,
+      "source_link": "https://solodit.cyfrin.io/issues/euler-mint-manipulation",
+      "github_link": ""
     }
-  ]
+  ],
+  "metadata": {
+    "totalResults": 1,
+    "currentPage": 1,
+    "pageSize": 20,
+    "totalPages": 1,
+    "elapsed": 42
+  }
 }

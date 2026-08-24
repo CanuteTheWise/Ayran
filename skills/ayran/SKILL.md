@@ -115,6 +115,17 @@ an untested surface as safe; record examined vs untried dimensions.
    JSON) via `evidence.gate_b` — asserted booleans are forgery.
 5. **Report** only after validation. Report generation must not launch tools.
 
+## Prior-art check (conditional Solodit)
+
+Once scope is bound and the protocol/project name is known, run
+`solodit.search` once for the project name, and again whenever a novel
+mechanism family becomes the focus of the hunt. Treat every result as a
+**lead**: prior findings show where similar designs broke; they never prove
+that this code breaks. Queries carry public project names and mechanism
+words only - never contract addresses, transaction hashes, or raw URLs.
+For brand-new protocols with no history, skip the check rather than force
+empty searches.
+
 Prefer the ten-verb skill catalog (`ayran.skill.verbs`; documented in the
 root README) over dumping journals into chat. Operator commands:
 `/ayran:activate`, `/ayran:status`, `/ayran:doctor`, `/ayran:stop`.

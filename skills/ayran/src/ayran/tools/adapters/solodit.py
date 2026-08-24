@@ -1,12 +1,20 @@
-"""Solodit HTTP search adapter: privacy filter, pagination, rate limit, citation."""
+"""Solodit HTTP search adapter: privacy filter, pagination, rate limit, citation.
+
+Speaks the captured Cyfrin contract: ``POST /api/v1/solodit/findings`` with an
+``X-Cyfrin-API-Key`` header and a filters body. Protocol-name queries are
+allowed and audited; contract addresses, transaction hashes, and raw URLs stay
+hard-rejected.
+"""
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
+from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 
 from ayran.graph.canonical import canonical_hash, utc_now
 from ayran.tools.base import HttpAdapter, bytes_hash
@@ -27,21 +35,38 @@ _TARGETISH_RE = re.compile(
     r"\b(token|vault|pool|pair|router|proxy|implementation|usdc|usdt|weth|dai)\b",
     re.IGNORECASE,
 )
+_IDENTIFIER_RE = re.compile(r"\b[A-Z]{2,}[a-z]+[A-Z][A-Za-z]+\b")
 PROVIDER_TERMS = "Solodit historical findings are leads only; provider terms apply at first use."
 DEFAULT_CACHE_TTL_SECONDS = 86400
+_KEY_FILE = Path.home() / ".config" / "ayran" / "solodit.key"
 
 
-def privacy_issues(query: str) -> list[str]:
+def hard_privacy_issues(query: str) -> list[str]:
+    """Categories that always refuse a query: real identifiers, never names."""
+
     issues: list[str] = []
     if _ADDRESS_RE.search(query):
         issues.append("contract-address")
     if _TX_RE.search(query):
         issues.append("transaction-hash")
-    if re.search(r"\b[A-Z]{2,}[a-z]+[A-Z][A-Za-z]+\b", query) and _TARGETISH_RE.search(query):
-        issues.append("target-specific-identifier")
     if re.search(r"https?://", query, re.IGNORECASE):
         issues.append("absolute-url")
     return issues
+
+
+def soft_privacy_flags(query: str) -> list[str]:
+    """Audited-but-allowed patterns: public protocol/project style names."""
+
+    flags: list[str] = []
+    if _IDENTIFIER_RE.search(query) and _TARGETISH_RE.search(query):
+        flags.append("target-specific-identifier")
+    return flags
+
+
+def privacy_issues(query: str) -> list[str]:
+    """Backward-compatible view: only the hard-rejected categories."""
+
+    return hard_privacy_issues(query)
 
 
 def query_hash(request: SoloditSearchRequest) -> str:
@@ -87,18 +112,38 @@ class SoloditAdapter(HttpAdapter):
             return False
         return not policy.allowed_hosts or host in policy.allowed_hosts
 
+    @staticmethod
+    def _api_key() -> str:
+        """Cyfrin API key: ``AYRAN_SOLODIT_API_KEY`` env override, then the
+        operator key file (``~/.config/ayran/solodit.key``). Attached as a
+        request header only; never logged, hashed into receipts, or echoed."""
+
+        value = os.environ.get("AYRAN_SOLODIT_API_KEY", "").strip()
+        if value:
+            return value
+        try:
+            return _KEY_FILE.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+
     async def run(self, request: SoloditSearchRequest, policy: ExecutionPolicy) -> RawRun:  # type: ignore[override]
         started = utc_now()
         digest = query_hash(request)
-        issues = privacy_issues(request.query)
+        issues = hard_privacy_issues(request.query)
         if issues:
             self._audit(digest, True, ",".join(issues))
             raise ToolError(
                 PRIVACY_REJECTED,
-                "Solodit queries must be abstract/mechanism-based; target identifiers are forbidden",
+                "Solodit queries must be abstract/mechanism-based; addresses, hashes, and raw URLs are forbidden",
                 details={"reasons": issues, "query_hash": digest},
             )
-        self._audit(digest, False, "mechanism-query")
+        soft = soft_privacy_flags(request.query)
+        audit_reason = "mechanism-query"
+        if request.protocol:
+            audit_reason = "protocol-name-query"
+        elif soft:
+            audit_reason = f"mechanism-query;{','.join(soft)}"
+        self._audit(digest, False, audit_reason)
         cached = self.cache.get(digest)
         now = time.monotonic()
         if cached and cached[0] > now:
@@ -134,22 +179,31 @@ class SoloditAdapter(HttpAdapter):
                 "Solodit endpoint is not permitted by the current execution policy",
                 details={"endpoint_hash": bytes_hash(endpoint.encode("utf-8"))},
             )
-        params = {
-            "q": request.query,
-            "page": str(request.page),
-            "page_size": str(request.page_size),
-        }
-        if request.cursor:
-            params["cursor"] = request.cursor
-        if request.category:
-            params["category"] = request.category
+        filters: dict[str, Any] = {}
+        keywords = request.query.strip()
+        if keywords:
+            filters["keywords"] = [keywords]
+        if request.protocol:
+            filters["protocol"] = request.protocol
         if request.severity:
-            params["severity"] = request.severity
-        url = f"{endpoint}/search?{urlencode(params)}"
+            filters["impact"] = [request.severity.upper()]
+        if request.category:
+            filters["tags"] = [{"value": request.category}]
+        payload_body: dict[str, Any] = {
+            "page": request.page,
+            "pageSize": request.page_size,
+            "sortField": "Recency",
+            "sortDirection": "DESC",
+        }
+        if filters:
+            payload_body["filters"] = filters
+        url = f"{endpoint}/api/v1/solodit/findings"
         timeout = min(policy.timeout_seconds, int(self.manifest.get("timeout_seconds") or 30))
+        api_key = self._api_key()
+        headers = {"X-Cyfrin-API-Key": api_key} if api_key else None
         try:
             self._rate_limit()
-            response = self.http_get(url, timeout=timeout)
+            response = self.http_post_json(url, payload_body, timeout=timeout, headers=headers)
         except ToolError as error:
             ended = utc_now()
             failure = "timeout" if "timed" in error.message.lower() else "network"
@@ -218,37 +272,50 @@ class SoloditAdapter(HttpAdapter):
             raise ToolError(PARSER_FAILED, f"Solodit JSON parse failed: {error}") from error
         if not isinstance(payload, dict):
             raise ToolError(PARSER_FAILED, "Solodit response must be an object")
-        results = payload.get("results") or payload.get("items") or payload.get("data") or []
-        if not isinstance(results, list):
-            raise ToolError(PARSER_FAILED, "Solodit results must be a list")
+        findings = payload.get("findings")
+        if not isinstance(findings, list):
+            raise ToolError(PARSER_FAILED, "Solodit response must carry a findings list")
         retrieved = utc_now()
         records: list[SoloditRecord] = []
-        for item in results:
+        for item in findings:
             if not isinstance(item, dict):
                 continue
-            source_url = str(item.get("source_url") or item.get("url") or "")
-            record_id = str(item.get("record_id") or item.get("id") or "")
-            if not source_url or not record_id:
-                raise ToolError(PARSER_FAILED, "every Solodit record must include source_url and record_id")
+            record_id = str(item.get("id") or "")
+            slug = str(item.get("slug") or "")
+            source_url = str(
+                item.get("source_link")
+                or item.get("github_link")
+                or (f"/issues/{slug}" if slug else "")
+            )
+            if not record_id or not source_url:
+                raise ToolError(
+                    PARSER_FAILED,
+                    "every Solodit finding must include an id and a resolvable link",
+                )
             records.append(
                 SoloditRecord(
                     title=str(item.get("title") or "untitled")[:256],
-                    severity=str(item["severity"]) if item.get("severity") else None,
-                    category=str(item["category"]) if item.get("category") else None,
-                    protocol=str(item["protocol"]) if item.get("protocol") else None,
+                    severity=(str(item["impact"]).upper()[:64] if item.get("impact") else None),
+                    category=(str(item["firm_name"])[:128] if item.get("firm_name") else None),
+                    protocol=(str(item["protocol_name"])[:128] if item.get("protocol_name") else None),
                     source_url=source_url[:2048],
                     record_id=record_id[:128],
                     retrieved_at=retrieved,
                 )
             )
         digest = str(raw.extra.get("query_hash") or bytes_hash(raw.stdout))
-        page = 1
-        next_cursor = payload.get("next_cursor") or payload.get("next")
+        metadata = payload.get("metadata") or {}
+        try:
+            page = int(metadata.get("currentPage") or payload.get("page") or 1)
+            total_pages = int(metadata.get("totalPages") or 1)
+        except (TypeError, ValueError):
+            page, total_pages = 1, 1
+        next_cursor = str(page + 1) if page < total_pages else None
         result = SoloditSearchResult(
             query_hash=digest,
             records=records,
-            page=int(payload.get("page") or page),
-            next_cursor=str(next_cursor) if next_cursor else None,
+            page=page,
+            next_cursor=next_cursor,
             provider_terms=PROVIDER_TERMS,
             cache_hit=False,
         )

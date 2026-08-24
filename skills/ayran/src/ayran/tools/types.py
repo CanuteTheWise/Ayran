@@ -199,6 +199,7 @@ class SoloditSearchRequest(_Strict):
     cursor: str | None = None
     category: str | None = None
     severity: str | None = None
+    protocol: str | None = None
 
 
 class SoloditRecord(_Strict):

@@ -8,6 +8,7 @@ returned environment maps; only hashes are retained.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -715,6 +716,49 @@ class HttpAdapter:
         except urllib.error.HTTPError as error:
             body = error.read()[: self.max_response_bytes]
             return HttpResponse(int(error.code), body, dict(error.headers.items()) if error.headers else {})
+        except urllib.error.URLError as error:
+            raise ToolError("network", f"HTTP request failed: {error.reason}") from error
+
+    def http_post_json(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        timeout: int,
+        headers: dict[str, str] | None = None,
+    ) -> HttpResponse:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ToolError(PRIVACY_REJECTED, "HTTP adapter only allows http(s) URLs")
+        body = json.dumps(payload).encode("utf-8")
+        hdrs = {
+            "User-Agent": "ayran-solodit-adapter/1.0",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        if headers:
+            hdrs.update(headers)
+        if self.transport is not None:
+            return self.transport("POST", url, body, hdrs, timeout)
+        request = urllib.request.Request(url, data=body, headers=hdrs, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                status = int(getattr(response, "status", 200))
+                chunks: list[bytes] = []
+                total = 0
+                while True:
+                    chunk = response.read(65536)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > self.max_response_bytes:
+                        raise ToolError("network", "HTTP response exceeded the 10 MiB cap")
+                    chunks.append(chunk)
+                header_map = {str(key): str(value) for key, value in response.headers.items()}
+                return HttpResponse(status, b"".join(chunks), header_map)
+        except urllib.error.HTTPError as error:
+            error_body = error.read()[: self.max_response_bytes]
+            return HttpResponse(int(error.code), error_body, dict(error.headers.items()) if error.headers else {})
         except urllib.error.URLError as error:
             raise ToolError("network", f"HTTP request failed: {error.reason}") from error
 

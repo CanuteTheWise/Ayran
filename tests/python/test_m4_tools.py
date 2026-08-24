@@ -229,15 +229,21 @@ def test_parse_slither_fixtures_classifies_false_positive() -> None:
     assert clean.alerts == []
 
 
-def test_solodit_privacy_and_parse() -> None:
+def test_solodit_privacy_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
     assert privacy_issues("reentrancy after external call") == []
     assert "contract-address" in privacy_issues("analyze 0x" + "a" * 40)
+    # Protocol/project names are public information: allowed, audited.
+    assert privacy_issues("Euler protocol reentrancy history") == []
     registry = _registry(probe_on_load=False)
+    captured: dict[str, Any] = {}
 
     def transport(
         method: str, url: str, body: bytes | None, headers: dict[str, str], timeout: int
     ) -> HttpResponse:
-        _ = method, body, headers, timeout, url
+        captured["method"] = method
+        captured["url"] = url
+        captured["body"] = body
+        captured["headers"] = headers
         return HttpResponse(200, (FIXTURES / "solodit-search-results.json").read_bytes())
 
     adapter = SoloditAdapter(
@@ -251,18 +257,31 @@ def test_solodit_privacy_and_parse() -> None:
             )
         )
     assert raised.value.code == PRIVACY_REJECTED
+
+    monkeypatch.setenv("AYRAN_SOLODIT_API_KEY", "test-key-material")
     raw = asyncio.run(
         adapter.run(
-            SoloditSearchRequest(query="reentrancy after token transfer"),
+            SoloditSearchRequest(query="reentrancy after token transfer", protocol="Euler"),
             ExecutionPolicy(network="approved-api", allowed_hosts=("solodit.cyfrin.io",)),
         )
     )
+    assert captured["method"] == "POST"
+    assert captured["url"].endswith("/api/v1/solodit/findings")
+    request_body = json.loads(captured["body"])
+    assert request_body["filters"]["keywords"] == ["reentrancy after token transfer"]
+    assert request_body["filters"]["protocol"] == "Euler"
+    assert captured["headers"]["X-Cyfrin-API-Key"] == "test-key-material"
+    audit_reasons = [entry["reason"] for entry in adapter.privacy_audit if entry["rejected"] == "false"]
+    assert any("protocol-name-query" in reason for reason in audit_reasons)
+
     parsed = adapter.parse(raw)
-    assert parsed.records[0].source_url
-    assert parsed.records[0].record_id
+    assert parsed.records[0].source_url.startswith("https://solodit.cyfrin.io/")
+    assert parsed.records[0].record_id == "FND-1001"
+    assert parsed.records[0].protocol == "Euler"
+    assert parsed.records[0].severity == "HIGH"
     assert parsed.evidence_ceiling == "lead"
     assert parsed.page == 1
-    assert parsed.next_cursor == "page-2"
+    assert parsed.next_cursor is None
 
 
 def test_environment_filtering_strips_secrets() -> None:
