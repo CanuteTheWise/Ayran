@@ -237,11 +237,15 @@ def enrich(
         if not links:
             continue
         summary["with_links"] += 1
-        existing = record.get("postmortem") or {}
-        if existing.get("status") == "ok" and not refresh:
+        usable = [url for url in links if _host(url) not in _EXPLORER_HOSTS]
+        summary["explorer_skipped"] += len(links) - len(usable)
+        if not usable:
+            continue
+        existing_any = record.get("postmortem") or {}
+        if existing_any.get("status") == "ok" and not refresh:
             summary["fetched_ok"] += 1
             continue
-        pending.append((record, locator, links))
+        pending.append((record, locator, usable))
 
     planned = sum(len(links) for _, _, links in pending)
     if limit is not None:
