@@ -718,3 +718,44 @@ def test_krait_framework_json_checks_parse(tmp_path: Path) -> None:
     # Non-JSON and non-framework input fall through empty for the block parser.
     assert parse_krait_framework_checks("id: x\nname: y\n---\nid: z\nname: w\n") == {}
     assert parse_krait_framework_checks("[]") == {}
+
+
+def test_krait_framework_json_beyond_record_cap(tmp_path: Path) -> None:
+    """T15 (live-corpus repair): the frameworks aggregate exceeds the
+    per-record text cap; the service must read .json files whole so the
+    strict JSON parse sees every byte and all checks survive."""
+    from ayran.knowledge.paths import MAX_RECORD_BYTES
+
+    root = copy_knowledge(tmp_path)
+    checkout = tmp_path / "krait-checkout"
+    frameworks = checkout / "checklist" / "frameworks"
+    frameworks.mkdir(parents=True)
+    pad = " " * (MAX_RECORD_BYTES + 2048)
+    body = (
+        '{"pad":"' + pad + '",'
+        '"label":"Lending","totalChecks":2,"version":"3.0.0","checks":['
+        '{"id":"LN-01","q":"Is collateral validation secure?","sev":"high",'
+        '"cat":"Collateral","tags":["collateral"]},'
+        '{"id":"LN-02","q":"Is the oracle price fresh?","sev":"critical",'
+        '"cat":"Oracle","tags":["oracle"]}]}'
+    )
+    blob = '{"lending":' + body + "}"
+    (frameworks / "index.json").write_text(blob, encoding="utf-8")
+    assert (frameworks / "index.json").stat().st_size > MAX_RECORD_BYTES
+
+    result = ingest_krait_deep(
+        root,
+        checkout,
+        commit="76e5ac7b74ce5517409870c2974e6baaddc8f99e",
+    )
+    assert result["deep_records"] == 2
+    assert result["superseded"] == 12
+    records = load_staged_records(root, "krait")
+    mechanisms = {
+        record.canonical_key: record
+        for record in records
+        if record.record_type == "mechanism"
+    }
+    first = mechanisms["krait-deep-lending-ln01"]
+    assert first.title == "Is collateral validation secure?"
+    assert "[high]" in first.summary

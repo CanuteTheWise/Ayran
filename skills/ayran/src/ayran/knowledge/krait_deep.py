@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 KRAIT_DEEP_PARSER_VERSION = "krait-deep-1.1.0"
 SUPERSEDED_BY_KEY = "superseded-by:krait-deep"
+# The frameworks aggregate is one JSON document well beyond the per-record
+# text cap; it gets a dedicated bound so the strict JSON parse sees all bytes.
+KRAIT_JSON_MAX_BYTES = 2_000_000
 
 _CHECK_SPLIT = re.compile(r"^---+\s*$", re.MULTILINE)
 _LABELED_LINE = re.compile(r"^([A-Za-z][A-Za-z0-9 _-]{0,30})\s*[:=]\s*(.*)$")
@@ -39,11 +42,13 @@ def _as_list(value: Any) -> list[str]:
     return [str(value)]
 
 
-def _parse_block(block: str) -> dict[str, Any]:
+def _parse_block(block: str, *, yaml_strict: bool = False) -> dict[str, Any]:
     try:
         loaded = load_yaml(block)
     except YamlLiteError:
         loaded = None
+        if yaml_strict:
+            return {}
     if isinstance(loaded, dict):
         return {str(key): value for key, value in loaded.items()}
     mapping: dict[str, Any] = {}
@@ -126,11 +131,18 @@ def check_record_values(mapping: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def parse_krait_check_block(text: str) -> dict[str, dict[str, Any]]:
+def parse_krait_check_block(
+    text: str,
+    *,
+    yaml_strict: bool = False,
+) -> dict[str, dict[str, Any]]:
     """Parse one or more ``---``-separated check blocks into record payloads.
 
     Records with no derivable predicates are returned too; callers count
     them separately (empty predicates are allowed, never fabricated).
+    With ``yaml_strict`` set, blocks whose YAML sits outside the supported
+    subset are dropped instead of falling back to labeled-line scraping -
+    the multi-document pattern library must not become junk records.
     """
 
     records: dict[str, dict[str, Any]] = {}
@@ -138,7 +150,7 @@ def parse_krait_check_block(text: str) -> dict[str, dict[str, Any]]:
         stripped = block.strip()
         if not stripped:
             continue
-        values = check_record_values(_parse_block(stripped))
+        values = check_record_values(_parse_block(stripped, yaml_strict=yaml_strict))
         if values is None:
             continue
         key = str(values["canonical_key"])

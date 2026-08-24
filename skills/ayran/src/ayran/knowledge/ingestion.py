@@ -250,12 +250,20 @@ def _defihacklabs_parsed(ctx: IngestionContext, raw_root: Path) -> list[ParsedRe
 def _krait_deep_parsed(ctx: IngestionContext) -> list[ParsedRecord]:
     files = ctx.working.get("krait_deep_files") or []
     parsed: list[ParsedRecord] = []
+    source_code_suffixes = {"ts", "tsx", "js", "mjs", "cjs", "sh", "py", "toml"}
     for relpath, text in files:
         if not isinstance(text, str):
             continue
+        suffix = relpath.rsplit(".", 1)[-1].lower() if "." in relpath else ""
+        if suffix in source_code_suffixes:
+            # Executable/source text is not check-block material; the
+            # execution-artifact scan already bounds what may materialize.
+            continue
         digest = sha256_bytes(text.encode("utf-8"))
-        if relpath.lower().endswith(".json"):
+        if suffix == "json":
             records = parse_krait_framework_checks(text)
+        elif suffix in {"yaml", "yml"}:
+            records = parse_krait_check_block(text, yaml_strict=True)
         else:
             records = parse_krait_check_block(text)
         for key, values in records.items():

@@ -29,7 +29,10 @@ from ayran.knowledge.ingestion import (
 from ayran.knowledge.ingestion import (
     ingest_source as run_ingest,
 )
-from ayran.knowledge.krait_deep import supersede_micro_summaries
+from ayran.knowledge.krait_deep import (
+    KRAIT_JSON_MAX_BYTES,
+    supersede_micro_summaries,
+)
 from ayran.knowledge.models import (
     KnowledgeRecord,
     LicenseInfo,
@@ -273,7 +276,15 @@ def ingest_krait_deep(
         target = deep_dest / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
-        text = path.read_bytes()[:MAX_RECORD_BYTES].decode("utf-8", errors="strict")
+        raw_bytes = path.read_bytes()
+        if path.suffix.lower() == ".json":
+            # The frameworks aggregate is one large JSON document; the
+            # per-record text cap would truncate it into invalid JSON.
+            if len(raw_bytes) > KRAIT_JSON_MAX_BYTES:
+                continue
+            text = raw_bytes.decode("utf-8", errors="strict")
+        else:
+            text = raw_bytes[:MAX_RECORD_BYTES].decode("utf-8", errors="strict")
         deep_files.append((f"deep/{relative.as_posix()}", text))
     if not deep_files:
         raise KnowledgeError(
