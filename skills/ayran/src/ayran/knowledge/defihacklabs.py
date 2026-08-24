@@ -21,12 +21,13 @@ from ayran.knowledge.models import IncidentCard, LicenseInfo, SourcePin, SourceR
 from ayran.knowledge.paths import PINNED_TIME
 
 DEFIHACKLABS_ORIGIN = "https://github.com/SunWeb3Sec/DeFiHackLabs"
-DEFIHACKLABS_PARSER_VERSION = "defihacklabs-1.0.0"
+DEFIHACKLABS_PARSER_VERSION = "defihacklabs-1.1.0"
 
 _HEX40 = r"0x[0-9a-fA-F]{40}(?![0-9a-fA-F])"
 _TX_VALUE = r"0x(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{40})(?![0-9a-fA-F])"
 _RELPATH_RE = re.compile(r"^src/test/(\d{4}-\d{2})/([^/]+)\.sol$")
 _EXPLOIT_BLOCK_RE = re.compile(r"EXPLOIT_BLOCK\s*(?:=|:)\s*(\d+)")
+_EXPLOIT_BLOCK_LABEL_RE = re.compile(r"\bblock\s*[:=]\s*(\d+)", re.IGNORECASE)
 _TX_HASH_RE = re.compile(
     rf"(?:tx|transaction)\D{{0,40}}({_TX_VALUE})",
     re.IGNORECASE,
@@ -43,7 +44,7 @@ _ADDRESS_LABEL_RES: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "victim",
         re.compile(
-            rf"(?:victim|harness|target\s+contract|vulnerable\s+contract|victim\s+contract|harness\s+contract)\D{{0,40}}({_HEX40})",
+            rf"(?:victim|harness|target\s+contract|vulnerable\s+contract|victim\s+contract|harness\s+contract|vulnerable)\D{{0,40}}({_HEX40})",
             re.IGNORECASE,
         ),
     ),
@@ -55,7 +56,7 @@ _VM_LABEL_RE = re.compile(
 _VM_LABEL_ATTACKER_WORDS = ("attacker", "exploiter", "attack eoa")
 _VM_LABEL_VICTIM_WORDS = ("victim", "harness", "target", "vulnerable")
 _LOSS_RE = re.compile(
-    r"(?:loss|lost|stolen|profit|amount)\s*[:=]?\s*~?\s*([0-9][0-9 ,_.]*)\s*([A-Za-z$][A-Za-z]{0,10})?",
+    r"(?:loss|lost|stolen|profit|amount)\s*[:=]?\s*[~$€£]*\s*([0-9][0-9 ,_.]*)\s*([A-Za-z$][A-Za-z]{0,10})?",
     re.IGNORECASE,
 )
 _ROOT_CAUSE_LABEL_RE = re.compile(
@@ -133,7 +134,14 @@ def contamination_group(protocol: str, incident: str) -> str:
 
 
 def _header_comment_lines(text: str) -> list[str]:
-    """Contiguous leading comment lines (// or one /*...*/ block) of the file."""
+    """Card-header comment lines of the file.
+
+    Real DeFiHackLabs files open with an SPDX comment, a ``pragma`` and
+    ``import`` lines BEFORE the ``@KeyInfo`` card block, so those boilerplate
+    lines no longer end the scan; collection stops at the first genuine
+    Solidity declaration instead. Files whose comments lead directly (the
+    documented fixture shape) parse exactly as before.
+    """
 
     lines: list[str] = []
     in_block = False
@@ -142,18 +150,18 @@ def _header_comment_lines(text: str) -> list[str]:
         if in_block:
             lines.append(raw)
             if "*/" in stripped:
-                break
+                in_block = False
             continue
         if stripped.startswith("/*"):
             lines.append(raw)
             in_block = "*/" not in stripped
-            if not in_block:
-                break
             continue
         if stripped.startswith("//"):
             lines.append(raw)
             continue
         if stripped == "":
+            continue
+        if re.match(r"^(?:pragma\s+solidity|import\b)", stripped):
             continue
         break
     return lines
@@ -258,6 +266,10 @@ def parse_header(source_text: str, relpath: str) -> DeFiHackLabsCard | Irregular
     block_match = _EXPLOIT_BLOCK_RE.search(source_text)
     if block_match is not None:
         exploit_block = int(block_match.group(1))
+    else:
+        label_match = _EXPLOIT_BLOCK_LABEL_RE.search(" ".join(header))
+        if label_match is not None:
+            exploit_block = int(label_match.group(1))
 
     attacker_address: str | None = None
     victim_addresses: list[str] = []

@@ -527,3 +527,75 @@ def test_krait_deep_ingest_predicate_records_supersede_micro_summaries(tmp_path:
     assert lenses == []
     published = query_records(root, record_type="mechanism")["records"]
     assert any(record["canonical_key"] == "krait-deep-krait0007" for record in published)
+
+
+def test_parser_reads_keyinfo_after_import_boilerplate(tmp_path: Path) -> None:
+    """T12 (live-corpus repair, operator-sanctioned 2026-08-24): real
+    DeFiHackLabs files place the @KeyInfo card AFTER the SPDX/pragma/import
+    preamble; every structured field must still parse and the numeric
+    assertions must survive verbatim."""
+    directory = tmp_path / "src" / "test" / "2026-06"
+    directory.mkdir(parents=True)
+    lines = [
+        "// SPDX-License-Identifier: UNLICENSED",
+        "pragma solidity ^0.8.10;",
+        "",
+        'import "forge-std/Test.sol";',
+        'import "../interface.sol";',
+        "",
+        "// @KeyInfo - Total Lost : ~$87,402 (146.60 WBNB drained from the pair)",
+        "// Attacker EOA     : 0x047547A4fa4a67C1032d249B49EC1a79c0460BAD",
+        "// Attacker Contract: 0xc08106a36BfA9CFad264F0d64fC45B93543485Ec",
+        "// Vulnerable       : 0x6f50cffEcd4e00EcF7E442774C08c089450B62Ca (BY token)",
+        "// Victim pair      : 0x1F358e18e0DB68FF33C2319C8DaD328eDF9B7059 (BY/WBNB)",
+        "// Attack Tx        : 0xe31c681eee764fb94b1b6bda3bbb0e4f25acb129c19040b9f58ad30541980979",
+        "// Attack date      : June 4, 2026  Chain: BSC  Block: 102329719",
+        "//",
+        "// Root cause: triggerAutoBurn() is permissionless.",
+        "// Attacker corners BY supply via router, donates WBNB to hit trading threshold,",
+        "// triggers burn to crash BY reserve, then drains WBNB via a flash loan.",
+        "",
+        "interface IBYToken is IERC20 {",
+        "    function transfer(address to, uint256 amount) external returns (bool);",
+        "}",
+        "",
+        "contract BYToken_exp is Test {",
+        "    function testExploit() public {",
+        '        assertGt(profit, 0, "no profit");',
+        "    }",
+        "}",
+    ]
+    path = directory / "BYToken_exp.sol"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    cards = _iter_cards(tmp_path)
+    assert set(cards) == {"src/test/2026-06/BYToken_exp.sol"}
+    by = cards["src/test/2026-06/BYToken_exp.sol"]
+    assert by.tx_hash == "0xe31c681eee764fb94b1b6bda3bbb0e4f25acb129c19040b9f58ad30541980979"
+    assert by.exploit_block == 102329719
+    assert by.attacker_address == "0x047547A4fa4a67C1032d249B49EC1a79c0460BAD"
+    assert by.victim_addresses == [
+        "0x6f50cffEcd4e00EcF7E442774C08c089450B62Ca",
+        "0x1F358e18e0DB68FF33C2319C8DaD328eDF9B7059",
+    ]
+    assert by.loss_amount == "87,402"
+    assert by.root_cause_lines == [
+        "triggerAutoBurn() is permissionless.",
+        "Attacker corners BY supply via router, donates WBNB to hit trading threshold,",
+        "triggers burn to crash BY reserve, then drains WBNB via a flash loan.",
+    ]
+    assert 'assertGt(profit, 0, "no profit");' in by.assertions
+
+    record = to_incident_card(
+        by,
+        source_ref=SourceRef(source_id="defihacklabs", origin="https://github.com/SunWeb3Sec/DeFiHackLabs"),
+        pin=SourcePin(commit="deadbeef"),
+        raw_sha256="sha256:" + "1" * 64,
+        provenance_uri=f"https://github.com/SunWeb3Sec/DeFiHackLabs/blob/deadbeef/{by.relpath}",
+        sanitizers=[],
+    )
+    assert record.attack_tx_hash == by.tx_hash
+    assert record.exploit_block == 102329719
+    assert record.loss_amount == "87,402"
+    assert record.mechanism == "flash loan"
+    assert record.contamination_group == "contamination:bytoken:bytoken"
