@@ -182,7 +182,9 @@ class SoloditAdapter(HttpAdapter):
         filters: dict[str, Any] = {}
         keywords = request.query.strip()
         if keywords:
-            filters["keywords"] = [keywords]
+            # Live API (verified 2026-08-24): keywords is a single string,
+            # not the array an older capture suggested.
+            filters["keywords"] = keywords
         if request.protocol:
             filters["protocol"] = request.protocol
         if request.severity:

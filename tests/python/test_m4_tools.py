@@ -268,7 +268,7 @@ def test_solodit_privacy_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured["method"] == "POST"
     assert captured["url"].endswith("/api/v1/solodit/findings")
     request_body = json.loads(captured["body"])
-    assert request_body["filters"]["keywords"] == ["reentrancy after token transfer"]
+    assert request_body["filters"]["keywords"] == "reentrancy after token transfer"
     assert request_body["filters"]["protocol"] == "Euler"
     assert captured["headers"]["X-Cyfrin-API-Key"] == "test-key-material"
     audit_reasons = [entry["reason"] for entry in adapter.privacy_audit if entry["rejected"] == "false"]
