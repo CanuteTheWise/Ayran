@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
-  "manifest_id": "ayran-layer-m9-input-v1",
+  "manifest_id": "ayran-layer-0.2.0-private-release-v1",
   "artifact_kind": "ayran-layer",
-  "milestone": "M9-private-release",
+  "milestone": "R6-private-release",
   "ayran_payload": {"manifest": "packaging/manifests/ayran-payload.json", "payload_id": "ayran-release-0.2.0"},
   "platform": {"lock": "compatibility/platform-lock.json", "supported_runtime": "linux-wsl2", "native_windows": false},
   "prime": {
@@ -16,11 +16,11 @@
     "fail_closed_on_unverified_or_incompatible": true
   },
   "preconditions": ["selected-wsl2-distribution", "ext4-install-and-state-roots", "prime-v0.7.2-compatibility-tests-pass", "payload-integrity-valid"],
-  "activation": {"behavior": "activate only Ayran-owned paths beside peer Prime after health checks", "atomic_pointer_required": true, "implemented_at_m9": true},
+  "activation": {"behavior": "activate only Ayran-owned paths beside peer Prime after health checks", "atomic_pointer_required": true, "implemented": true},
   "health_checks": ["layer.payload-integrity", "layer.prime-compatibility", "layer.package-discovery", "layer.external-tool-detect-only", "layer.receipt-ownership"],
   "receipt": {"required": true, "schema_version": "1.0.0", "prime_classification": "observed-external", "created_paths_only": true},
   "rollback_uninstall": {"ownership": "receipt-listed-ayran-paths-only", "remove_prime": false, "remove_external_tools": false},
   "external_tools": {"policy": "detect-and-health-check-only", "copy": false, "install": false, "upgrade": false, "remove": false},
   "notices": ["LICENSES/README.md"],
-  "integrity": {"checksums_required": true, "release_signature_required_at_m9": true, "m9_release_candidate": true}
+  "integrity": {"checksums_required": true, "release_signature_required_for_private_release": true, "private_release_candidate": true}
 }

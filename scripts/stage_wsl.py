@@ -144,10 +144,10 @@ def enumerate_payload(
     payload = load_json(manifest_path)
     if (
         payload.get("schema_version") != "1.0.0"
-        or payload.get("milestone") not in {"M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9"}
+        or payload.get("milestone") not in {"M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "R6"}
         or payload.get("runtime_implemented") is not True
     ):
-        raise StageError("the staging helper only accepts a frozen M1-M9 payload contract")
+        raise StageError("the staging helper only accepts a frozen M1-M9 or Phase-B R6 payload contract")
     selected: dict[str, Path] = {}
     for value in payload.get("files", []):
         if not isinstance(value, str):

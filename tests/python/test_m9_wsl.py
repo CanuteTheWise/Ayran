@@ -27,10 +27,10 @@ def test_socket_permissions_restart_and_cleanup(tmp_path: Path) -> None:
     assert result["cleaned"] is True
 
 
-def test_payload_enumerates_m9(tmp_path: Path) -> None:
+def test_payload_enumerates_phase_b(tmp_path: Path) -> None:
     from scripts import stage_wsl
 
     files, identity = stage_wsl.enumerate_payload(ROOT, "layer")
-    assert identity["milestone"] == "M9"
+    assert identity["milestone"] == "R6"
     assert files
     _ = tmp_path

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "payload_id": "ayran-release-0.2.0",
-  "milestone": "M9",
+  "milestone": "R6",
   "runtime_implemented": true,
   "files": [
     "README.md",
@@ -42,7 +42,7 @@
     {"path": "skills/ayran", "ownership": "ayran", "role": "contracts-graph-runtime-and-core-skill"},
     {"path": "skills/specialists", "ownership": "ayran", "role": "rlm-specialist-skill-shells"},
     {"path": ".prime-template", "ownership": "ayran", "role": "trusted-workspace-template"},
-    {"path": "tests", "ownership": "ayran", "role": "m0-m9-verification-suites"},
+    {"path": "tests", "ownership": "ayran", "role": "m0-through-r6-verification-suites"},
     {"path": "evals", "ownership": "ayran", "role": "sealed-evaluation-definitions"},
     {"path": "docs/operations", "ownership": "ayran", "role": "operator-documentation"},
     {"path": "packaging/linux", "ownership": "ayran", "role": "linux-install-rollback-uninstall"},
