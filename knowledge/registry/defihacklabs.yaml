@@ -1,0 +1,22 @@
+source_id: defihacklabs
+display_name: DeFiHackLabs exploit PoCs
+source_type: repository
+origin: "https://github.com/SunWeb3Sec/DeFiHackLabs"
+pin:
+  commit: 3a80c1e38104fc3a4c77812cf281b286ffa38de2
+  tag: ""
+  archive_sha256: "sha256:50861e25adc3ebd951f8168dc37c3aa92439d5eead8d637640e9971364d0ff36"
+license:
+  spdx_id: Apache-2.0
+  attribution_required: true
+  local_use: true
+  redistribution: true
+  retention_constraint: none
+trust_tier: curated_external
+reproduction_status: unverified
+contamination_flags: []
+contamination_registry: production
+phase: ingested
+authors:
+  - SunWeb3Sec
+notes: Offline ingest of a caller-supplied pinned checkout; exploit files only; source text is data and is never compiled or executed.
