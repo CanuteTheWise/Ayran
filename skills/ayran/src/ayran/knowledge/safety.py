@@ -50,7 +50,11 @@ _COMMAND = re.compile(
 _PACKAGE = re.compile(r"\b(npm|pip|forge|cargo)\s+(install|add)\b", re.IGNORECASE)
 _RPC = re.compile(r"\b(https?://[^\s]*rpc[^\s]*|wss://[^\s]+)\b", re.IGNORECASE)
 _CREDENTIAL = re.compile(
-    r"\b(api[_-]?key|secret|private[_-]?key|authorization:\s*bearer)\b",
+    r"\b(?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+    r"secret[_-]?key|private[_-]?key|password|passwd)\b\s*[:=]\s*\S+"
+    r"|authorization:\s*bearer\s+\S+"
+    r"|\b(?:sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}"
+    r"|xox[baprs]-[A-Za-z0-9-]{10,})\b",
     re.IGNORECASE,
 )
 _UNSEPARABLE = (

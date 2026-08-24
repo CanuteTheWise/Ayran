@@ -42,6 +42,19 @@ def test_safety_scan_strips_and_rejects() -> None:
     assert inseparable.accepted is False
 
 
+def test_credential_scan_targets_values_not_vocabulary() -> None:
+    """Live-corpus repair (2026-08-24): checklist prose that merely mentions
+    secrets must pass, while assignment-shaped or well-known token formats
+    still quarantine. Real Krait framework check FN-02 said 'Are secrets
+    properly encrypted...' and was falsely flagged by the bare-noun rule."""
+    assert scan_text("Are secrets properly encrypted and not exposed?").accepted is True
+    assert scan_text("rotate your api keys regularly").accepted is True
+    assert scan_text("api_key = AKIAIOSFODNN7EXAMPLE").accepted is False
+    assert scan_text("password: hunter2correcthorse").accepted is False
+    assert scan_text("Authorization: Bearer super-secret-token").accepted is False
+    assert scan_text("token is ghp_0123456789abcdefghijklmnopqrstuvwxyz").accepted is False
+
+
 def test_ingest_zeroskills_attaches_provenance(tmp_path: Path) -> None:
     root = copy_knowledge(tmp_path)
     result = ingest_source(root, "zeroskills")
