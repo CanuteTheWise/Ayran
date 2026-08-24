@@ -116,6 +116,35 @@ def release_corpus(
     return manifest
 
 
+def enrich_postmortems(
+    knowledge_root: Path | str | None = None,
+    *,
+    source_id: str = "defihacklabs",
+    limit: int | None = None,
+    delay: float | None = None,
+    timeout: int | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Operator-sanctioned post-mortem enrichment (network, announced)."""
+
+    from ayran.knowledge.postmortems import (
+        DEFAULT_DELAY_SECONDS,
+        DEFAULT_TIMEOUT_SECONDS,
+    )
+    from ayran.knowledge.postmortems import (
+        enrich as run_enrichment,
+    )
+
+    root = _root(knowledge_root)
+    return run_enrichment(
+        root,
+        limit=limit,
+        delay=DEFAULT_DELAY_SECONDS if delay is None else float(delay),
+        timeout=DEFAULT_TIMEOUT_SECONDS if timeout is None else int(timeout),
+        dry_run=bool(dry_run),
+    )
+
+
 def knowledge_status(knowledge_root: Path | str | None = None) -> dict[str, Any]:
     return corpus_status(_root(knowledge_root))
 

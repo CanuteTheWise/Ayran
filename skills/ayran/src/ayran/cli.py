@@ -298,6 +298,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     _add_config(knowledge_audit)
     knowledge_audit.add_argument("--knowledge-root", type=Path)
+    knowledge_enrich = knowledge_sub.add_parser(
+        "enrich-postmortems",
+        help="operator-sanctioned network enrichment: follow linked post-mortem write-ups for staged incident cards",
+    )
+    _add_config(knowledge_enrich)
+    knowledge_enrich.add_argument("--source-id", default="defihacklabs")
+    knowledge_enrich.add_argument("--limit", type=int)
+    knowledge_enrich.add_argument("--delay", type=float)
+    knowledge_enrich.add_argument("--timeout", type=int)
+    knowledge_enrich.add_argument("--dry-run", action="store_true")
     knowledge_ingest_dhl = knowledge_sub.add_parser(
         "ingest-defihacklabs", help="offline ingest of a pinned DeFiHackLabs checkout"
     )
@@ -826,6 +836,17 @@ def _command_knowledge(arguments: argparse.Namespace) -> dict[str, Any]:
             from ayran.knowledge.registry_audit import audit_registry
 
             return audit_registry(root)
+        if command == "enrich-postmortems":
+            from ayran.knowledge.service import enrich_postmortems
+
+            return enrich_postmortems(
+                root,
+                source_id=str(arguments.source_id),
+                limit=getattr(arguments, "limit", None),
+                delay=getattr(arguments, "delay", None),
+                timeout=getattr(arguments, "timeout", None),
+                dry_run=bool(getattr(arguments, "dry_run", False)),
+            )
         if command == "ingest-defihacklabs":
             from ayran.knowledge.service import ingest_defihacklabs
 
