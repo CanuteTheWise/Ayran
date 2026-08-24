@@ -60,9 +60,11 @@ _LOSS_RE = re.compile(
     re.IGNORECASE,
 )
 _ROOT_CAUSE_LABEL_RE = re.compile(
-    r"^\s*(?:[-*>*#!]*\s*)?(?:root\s*cause|analysis|overview|description|details|exploit\s+summary)\s*[:\-]?\s*(.*)$",
+    r"^\s*(?:[-*>*#!@]*\s*)?(?:root\s*cause|analysis|analyses|overview|description|details|exploit\s+summary|summary)\s*[:\-]?\s*(.*)$",
     re.IGNORECASE,
 )
+_URL_RE = re.compile(r"https?://", re.IGNORECASE)
+_FORK_BLOCK_RE = re.compile(r"createSelectFork\([^)]*?,\s*([0-9_]{5,})")
 _ASSERTION_RE = re.compile(
     r"^\s*(?:vm\.)?assert\w*\s*\(.*\d.*\)\s*;|^\s*require\w*\s*\(.*\d.*\)\s*;",
 )
@@ -197,6 +199,8 @@ def _root_cause(header: list[str]) -> list[str]:
                 prose.append(head)
             continue
         if collecting:
+            if _URL_RE.search(clean):
+                break
             if _TX_HASH_RE.search(clean) or re.match(r"^[\w ]{0,24}:", clean, re.IGNORECASE):
                 break
             prose.append(clean)
@@ -270,6 +274,12 @@ def parse_header(source_text: str, relpath: str) -> DeFiHackLabsCard | Irregular
         label_match = _EXPLOIT_BLOCK_LABEL_RE.search(" ".join(header))
         if label_match is not None:
             exploit_block = int(label_match.group(1))
+        else:
+            fork_match = _FORK_BLOCK_RE.search(source_text)
+            if fork_match is not None:
+                fork_block = int(fork_match.group(1).replace("_", ""))
+                if fork_block > 0:
+                    exploit_block = fork_block
 
     attacker_address: str | None = None
     victim_addresses: list[str] = []

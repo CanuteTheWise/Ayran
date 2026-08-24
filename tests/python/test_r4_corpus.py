@@ -599,3 +599,55 @@ def test_parser_reads_keyinfo_after_import_boilerplate(tmp_path: Path) -> None:
     assert record.loss_amount == "87,402"
     assert record.mechanism == "flash loan"
     assert record.contamination_group == "contamination:bytoken:bytoken"
+
+
+def test_parser_analysis_section_and_fork_block_fallback(tmp_path: Path) -> None:
+    """T13 (live-corpus repair, survey-driven): @Analysis prose parses as root
+    cause while link lines stay out of it, and the exploited block comes from
+    createSelectFork when no header block label exists."""
+    directory = tmp_path / "src" / "test" / "2023-03"
+    directory.mkdir(parents=True)
+    lines = [
+        "// SPDX-License-Identifier: UNLICENSED",
+        "pragma solidity ^0.8.10;",
+        "",
+        'import "forge-std/Test.sol";',
+        "",
+        "// @KeyInfo - Total Lost : ~$197M",
+        "// Attacker : 0x5fe274bb0c32f0e0eea1e77b30d5a2eb3e07b3bd",
+        "// Attack Tx : https://etherscan.io/tx/0xc31bcc530831bf0682deb3ba24b1a6a485f5c8d1a1c3a2d2c6ef4f5a6b7c8d9e",
+        "",
+        "// @Analysis",
+        "// The oracle price was manipulated with a flash loan,",
+        "// then collateral accounting double-counted the inflated position.",
+        "// Post-mortem : https://example.invalid/post-mortem",
+        "",
+        "contract Euler_exp is Test {",
+        "    function setUp() public {",
+        '        vm.createSelectFork("mainnet", 16687227);',
+        "    }",
+        "}",
+    ]
+    path = directory / "Euler_exp.sol"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    cards = _iter_cards(tmp_path)
+    euler = cards["src/test/2023-03/Euler_exp.sol"]
+    assert euler.tx_hash == "0xc31bcc530831bf0682deb3ba24b1a6a485f5c8d1a1c3a2d2c6ef4f5a6b7c8d9e"
+    assert euler.exploit_block == 16687227
+    assert euler.attacker_address == "0x5fe274bb0c32f0e0eea1e77b30d5a2eb3e07b3bd"
+    assert euler.root_cause_lines == [
+        "The oracle price was manipulated with a flash loan,",
+        "then collateral accounting double-counted the inflated position.",
+    ]
+
+    record = to_incident_card(
+        euler,
+        source_ref=SourceRef(source_id="defihacklabs", origin="https://github.com/SunWeb3Sec/DeFiHackLabs"),
+        pin=SourcePin(commit="deadbeef"),
+        raw_sha256="sha256:" + "2" * 64,
+        provenance_uri=f"https://github.com/SunWeb3Sec/DeFiHackLabs/blob/deadbeef/{euler.relpath}",
+        sanitizers=[],
+    )
+    assert record.mechanism == "oracle"
+    assert record.attack_tx_hash == euler.tx_hash
