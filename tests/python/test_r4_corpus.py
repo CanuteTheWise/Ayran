@@ -653,6 +653,40 @@ def test_parser_analysis_section_and_fork_block_fallback(tmp_path: Path) -> None
     assert record.attack_tx_hash == euler.tx_hash
 
 
+def test_mechanism_keyword_matches_upstream_spellings(tmp_path: Path) -> None:
+    """T17 (vocabulary widening): upstream writes 'flashloan', 'FRONTRUNNING',
+    'price manipulation is possible' - compact matching must map them onto
+    the canonical mechanism labels."""
+    directory = tmp_path / "src" / "test" / "2026-01"
+    directory.mkdir(parents=True)
+    lines = [
+        "// SPDX-License-Identifier: UNLICENSED",
+        "pragma solidity ^0.8.10;",
+        "",
+        "// Root cause: flashloan was used to inflate the share price,",
+        "// then liquidity was drained through a rounding error.",
+        "",
+        "contract X_exp is Test {",
+        "    function testExploit() public {",
+        '        assertEq(uint256(1), 1);',
+        "    }",
+        "}",
+    ]
+    path = directory / "X_exp.sol"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    cards = _iter_cards(tmp_path)
+    record = to_incident_card(
+        cards["src/test/2026-01/X_exp.sol"],
+        source_ref=SourceRef(source_id="defihacklabs", origin="https://github.com/SunWeb3Sec/DeFiHackLabs"),
+        pin=SourcePin(commit="deadbeef"),
+        raw_sha256="sha256:" + "7" * 64,
+        provenance_uri="https://example.invalid/x",
+        sanitizers=[],
+    )
+    assert record.mechanism == "flash loan"
+
+
 def test_yaml_lite_rejects_deeper_inline_map_continuation() -> None:
     """T14a (live-corpus repair): inline mapping entries whose continuation
     lines are indented deeper than dash-indent+2 must raise YamlLiteError,

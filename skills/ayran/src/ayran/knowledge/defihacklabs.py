@@ -84,6 +84,23 @@ _MECHANISM_KEYWORDS = (
     "cross-chain",
     "logic error",
     "rounding",
+    # Upstream-vocabulary widenings (2026-08-24, live-corpus survey): compact
+    # matching equates 'front-running'/'frontrunning' and 'flashloan' with the
+    # entries above; specifics stay ahead of generic tails.
+    "front-running",
+    "sandwich",
+    "liquidation",
+    "overflow",
+    "underflow",
+    "precision",
+    "slippage",
+    "uninitialized",
+    "proxy",
+    "callback",
+    "phishing",
+    "key compromise",
+    "replay",
+    "manipulation",
 )
 
 
@@ -208,9 +225,19 @@ def _root_cause(header: list[str]) -> list[str]:
 
 
 def _mechanism_keyword(root_cause_lines: list[str]) -> str | None:
+    """Match captured prose against the mechanism vocabulary.
+
+    Upstream spells vary ('flashloan', 'front-running', 'FRONTRUNNING'), so
+    both the prose and each keyword are compared in compact alphanumeric
+    form as well as verbatim; first keyword in list order wins so specific
+    phrases (``price manipulation``) outrank their generic tails
+    (``manipulation``).
+    """
+
     joined = " ".join(root_cause_lines).lower()
+    compact_prose = re.sub(r"[^a-z0-9]+", "", joined)
     for keyword in _MECHANISM_KEYWORDS:
-        if keyword in joined:
+        if keyword in joined or re.sub(r"[^a-z0-9]+", "", keyword) in compact_prose:
             return keyword
     return None
 
