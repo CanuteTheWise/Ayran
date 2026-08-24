@@ -989,6 +989,7 @@ def _command_eval(arguments: argparse.Namespace) -> dict[str, Any]:
                 targets=arguments.targets,
                 results_root=results_root,
                 seed=getattr(arguments, "seed", None),
+                knowledge_root=getattr(arguments, "knowledge_root", None),
             )
         arm = getattr(arguments, "arm", None)
         kwargs = {

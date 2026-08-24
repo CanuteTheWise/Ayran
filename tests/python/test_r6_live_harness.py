@@ -405,3 +405,111 @@ def test_timeout_yields_partial_transcript(
     assert body["exit_status"] == "timeout"
     assert partial in body["stdout"]
     assert body["ended_at"]
+
+
+def test_service_run_live_feeds_ingested_cards_to_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T16 (live-corpus repair, 2026-08-24): service.run_live must feed the
+    contamination gate the REAL staged incident inventory - an empty card
+    list made the bar vacuous exactly once real incidents existed."""
+    from types import SimpleNamespace
+
+    from ayran.evaluation import service as eval_service
+    from m7_fixtures import copy_knowledge
+
+    knowledge_root = copy_knowledge(tmp_path)
+    registry = knowledge_root / "registry" / "defihacklabs.yaml"
+    registry.write_text(
+        "\n".join(
+            [
+                "source_id: defihacklabs",
+                "display_name: DeFiHackLabs exploit PoCs",
+                "source_type: repository",
+                'origin: "https://github.com/SunWeb3Sec/DeFiHackLabs"',
+                "pin:",
+                '  commit: "' + "3" * 40 + '"',
+                '  archive_sha256: "sha256:' + "4" * 64 + '"',
+                "license:",
+                "  spdx_id: Apache-2.0",
+                "  attribution_required: true",
+                "  local_use: true",
+                "  redistribution: true",
+                "trust_tier: curated_external",
+                "phase: ingested",
+                "authors: [SunWeb3Sec]",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    staging = knowledge_root / "staging" / "defihacklabs"
+    staging.mkdir(parents=True)
+    colliding = _incident("krec_collision", "minivault", "minivault")
+    (staging / "records.json").write_text(
+        json.dumps(
+            {
+                "source_id": "defihacklabs",
+                "tree_hash": "sha256:" + "5" * 64,
+                "taxonomy_version": "1.0.0",
+                "conflicts": [],
+                "records": [colliding.model_dump(mode="json")],
+                "created_at": "2026-08-24T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sheet_path = tmp_path / "prereg.json"
+    sheet_path.write_text(
+        json.dumps(_prereg(targets=["eval-minivault"]).model_dump(mode="json")),
+        encoding="utf-8",
+    )
+
+    called = {"session": 0}
+
+    def _refuse_session(**kwargs):  # pragma: no cover - must never run
+        called["session"] += 1
+        raise AssertionError("run_live_session must not launch on collision")
+
+    monkeypatch.setattr("ayran.evaluation.live_runner.run_live_session", _refuse_session)
+    with pytest.raises(ContaminationViolation):
+        eval_service.run_live(
+            preregistration=sheet_path,
+            targets=FIXTURES,
+            results_root=tmp_path / "results-collision",
+            knowledge_root=knowledge_root,
+        )
+    assert called["session"] == 0
+
+    # Non-colliding inventory passes the gate and reaches the session intact.
+    benign = _incident("krec_benign", "totallyunrelatedprotocol", "otherincident")
+    (staging / "records.json").write_text(
+        json.dumps(
+            {
+                "source_id": "defihacklabs",
+                "tree_hash": "sha256:" + "6" * 64,
+                "taxonomy_version": "1.0.0",
+                "conflicts": [],
+                "records": [benign.model_dump(mode="json")],
+                "created_at": "2026-08-24T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _fake_session(**kwargs):
+        captured["cards"] = kwargs["cards"]
+        return SimpleNamespace(model_dump=lambda mode="json": {"ok": True})
+
+    captured: dict[str, object] = {}
+    monkeypatch.setattr("ayran.evaluation.live_runner.run_live_session", _fake_session)
+    payload = eval_service.run_live(
+        preregistration=sheet_path,
+        targets=FIXTURES,
+        results_root=tmp_path / "results-clean",
+        knowledge_root=knowledge_root,
+    )
+    assert payload == {"ok": True}
+    cards = captured["cards"]
+    assert [card.record_id for card in cards] == ["krec_benign"]

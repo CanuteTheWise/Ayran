@@ -113,12 +113,40 @@ def pause_eval(*, results_root: Path | str) -> dict[str, Any]:
     return {"paused": True, "path": str(pause_flag_path(results_root)), "wrote": str(path)}
 
 
+def _ingested_incident_cards(knowledge_root: Path | str | None) -> list[Any]:
+    """Every staged record carrying a contamination group, across sources.
+
+    The contamination gate is only as real as the card inventory fed into
+    it: before the 2026-08-24 live corpus pour, ``run_live`` handed the gate
+    an empty list, making the bar vacuous exactly when real incidents exist.
+    """
+
+    from ayran.knowledge.ingestion import load_staged_records
+    from ayran.knowledge.paths import default_knowledge_root
+    from ayran.knowledge.source_registry import list_sources as registry_list_sources
+
+    root = Path(knowledge_root) if knowledge_root is not None else default_knowledge_root()
+    cards: list[Any] = []
+    for entry in registry_list_sources(root):
+        if entry.phase not in {"ingested", "active"}:
+            continue
+        try:
+            staged = load_staged_records(root, entry.source_id)
+        except Exception:
+            staged = []
+        cards.extend(
+            card for card in staged if str(getattr(card, "contamination_group", "") or "")
+        )
+    return cards
+
+
 def run_live(
     *,
     preregistration: Path | str,
     targets: Path | str,
     results_root: Path | str,
     seed: int | None = None,
+    knowledge_root: Path | str | None = None,
 ) -> dict[str, Any]:
     from ayran.evaluation.live_runner import run_live_session
     from ayran.evaluation.preregistration import load_preregistration
@@ -127,12 +155,13 @@ def run_live(
 
     sheet = load_preregistration(preregistration)
     loaded = load_target_dir(targets)
-    selected = select_targets(loaded, [])
+    cards = _ingested_incident_cards(knowledge_root)
+    selected = select_targets(loaded, cards)
     manifest = run_live_session(
         preregistration=sheet,
         transport=ScriptedArmTransport(),
         targets=selected,
-        cards=[],
+        cards=cards,
         results_root=results_root,
         seeds=(int(seed),) if seed is not None else (7,),
     )
