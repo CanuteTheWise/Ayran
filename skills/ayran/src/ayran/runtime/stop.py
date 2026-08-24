@@ -43,7 +43,11 @@ def stop_run(
         except Exception:
             pass
         supervisor.terminate(entry, reason="operator_stop")
-    stopped.append(entry.identity_tuple())
+        # Append INSIDE the loop: with the append at function level, a run with
+        # zero running records crashed (UnboundLocalError) and multi-record runs
+        # reported only the last entry (found by the first real `ayran stop`
+        # execution during R6 close-out).
+        stopped.append(entry.identity_tuple())
     captured: dict[str, Any] | None = None
     graph_root = base / "graph"
     stream_path = base / "stream.json"
