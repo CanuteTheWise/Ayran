@@ -146,6 +146,22 @@ def _host(url: str) -> str:
     return match.group(1).lower() if match else ""
 
 
+def _status_id(url: str) -> str | None:
+    match = re.search(r"/status(?:es)?/(\d{5,})", url)
+    return match.group(1) if match else None
+
+
+def _mirror_candidates(url: str, host: str) -> list[str]:
+    """Readable mirrors attempted after the platform wall, oldest trick first."""
+
+    if host not in {"x.com", "twitter.com"}:
+        return []
+    status_id = _status_id(url)
+    if not status_id:
+        return []
+    return [f"https://threadreaderapp.com/thread/{status_id}.html"]
+
+
 def fetch(url: str, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Fetch one write-up page. Never raises; always returns a status dict."""
 
@@ -171,8 +187,16 @@ def fetch(url: str, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]
         return {"url": url, "status": "paywall", "text": text[:EXCERPT_CHARS] if text else None}
     if not text or not text.strip():
         return {"url": url, "status": "empty", "text": None}
-    if host in {"x.com", "twitter.com"} or (_looks_like_shell(text) and "x.com" in host):
-        return {"url": url, "status": "x-wall", "text": text[:EXCERPT_CHARS]}
+    if host in {"x.com", "twitter.com"}:
+        if _looks_like_shell(text):
+            for mirror in _mirror_candidates(url, host):
+                mirrored = fetch(mirror, timeout=timeout)
+                if mirrored["status"] == "ok" and mirrored.get("text"):
+                    mirrored["url"] = url
+                    mirrored["mirror"] = mirror
+                    return mirrored
+            return {"url": url, "status": "x-wall", "text": text[:EXCERPT_CHARS]}
+        return {"url": url, "status": "ok", "text": text[:EXCERPT_CHARS]}
     safety = scan_text(text[: MAX_FETCH_BYTES])
     if not safety.accepted:
         return {"url": url, "status": "blocked-safety", "text": None}
