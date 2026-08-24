@@ -22,7 +22,7 @@ from ayran.knowledge.errors import (
     KnowledgeError,
 )
 from ayran.knowledge.hard_negatives import ensure_hard_negatives
-from ayran.knowledge.krait_deep import parse_krait_check_block
+from ayran.knowledge.krait_deep import parse_krait_check_block, parse_krait_framework_checks
 from ayran.knowledge.models import (
     KnowledgeRecord,
     LicenseInfo,
@@ -254,7 +254,11 @@ def _krait_deep_parsed(ctx: IngestionContext) -> list[ParsedRecord]:
         if not isinstance(text, str):
             continue
         digest = sha256_bytes(text.encode("utf-8"))
-        for key, values in parse_krait_check_block(text).items():
+        if relpath.lower().endswith(".json"):
+            records = parse_krait_framework_checks(text)
+        else:
+            records = parse_krait_check_block(text)
+        for key, values in records.items():
             parsed.append(
                 ParsedRecord(
                     locator=f"{relpath}#{key}",

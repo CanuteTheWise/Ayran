@@ -651,3 +651,70 @@ def test_parser_analysis_section_and_fork_block_fallback(tmp_path: Path) -> None
     )
     assert record.mechanism == "oracle"
     assert record.attack_tx_hash == euler.tx_hash
+
+
+def test_yaml_lite_rejects_deeper_inline_map_continuation() -> None:
+    """T14a (live-corpus repair): inline mapping entries whose continuation
+    lines are indented deeper than dash-indent+2 must raise YamlLiteError,
+    never spin forever (found hanging on 26 real Krait pattern YAMLs)."""
+    from ayran.tools.yaml_lite import YamlLiteError, load_yaml
+
+    with pytest.raises(YamlLiteError):
+        load_yaml("a:\n  - x: 1\n     y: 2\n")
+    with pytest.raises(YamlLiteError):
+        load_yaml("a:\n  - x: 1\n      y: 2\n        z: 3\n")
+    # Well-formed documents keep parsing.
+    assert load_yaml("a:\n  - x: 1\n    y: 2\n") == {"a": [{"x": 1, "y": 2}]}
+
+
+def test_krait_framework_json_checks_parse(tmp_path: Path) -> None:
+    """T14b (live-corpus repair): the checklist/frameworks JSON aggregate
+    (845 checks at the pinned commit) becomes predicate-keyed mechanism
+    records with verbatim questions and framework/tag applicability."""
+    import json as _json
+
+    from ayran.knowledge.krait_deep import parse_krait_framework_checks
+
+    blob = _json.dumps(
+        {
+            "lending": {
+                "label": "Lending / Borrowing",
+                "totalChecks": 2,
+                "version": "3.0.0",
+                "checks": [
+                    {
+                        "id": "LN-01",
+                        "q": "Is your collateral validation implemented securely?",
+                        "sev": "high",
+                        "cat": "Collateral Management",
+                        "tags": ["collateral"],
+                    },
+                    {
+                        "id": "LN-02",
+                        "q": "Is your price manipulation implemented securely?",
+                        "sev": "critical",
+                        "cat": "Economic Attacks",
+                        "tags": ["MEV", "flash-loan", "liquidation", "oracle"],
+                    },
+                    {"note": "no id and no q - skipped"},
+                ],
+            }
+        }
+    )
+    records = parse_krait_framework_checks(blob)
+    assert set(records) == {"krait-deep-lending-ln01", "krait-deep-lending-ln02"}
+    first = records["krait-deep-lending-ln01"]
+    assert first["record_type"] == "mechanism"
+    assert first["title"] == "Is your collateral validation implemented securely?"
+    assert first["summary"] == "[high] Is your collateral validation implemented securely?"
+    assert first["applicability_predicates"] == [
+        "framework:lending",
+        "pattern:collateral",
+        "pattern:collateralmanagement",
+    ]
+    second = records["krait-deep-lending-ln02"]
+    assert "[critical]" in second["summary"]
+    assert "pattern:flashloan" in second["applicability_predicates"]
+    # Non-JSON and non-framework input fall through empty for the block parser.
+    assert parse_krait_framework_checks("id: x\nname: y\n---\nid: z\nname: w\n") == {}
+    assert parse_krait_framework_checks("[]") == {}

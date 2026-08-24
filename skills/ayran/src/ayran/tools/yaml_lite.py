@@ -178,7 +178,12 @@ def load_yaml(text: str) -> Any:
                 nxt = _peek()
                 child_indent = indent + 2
                 while nxt is not None and nxt[0] >= child_indent and not nxt[1].startswith("- "):
+                    before = index
                     nested.update(_parse_mapping(child_indent))
+                    if index == before:
+                        raise YamlLiteError(
+                            "unsupported indentation in inline mapping entry"
+                        )
                     nxt = _peek()
                 items.append(nested)
             else:

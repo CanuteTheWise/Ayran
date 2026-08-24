@@ -11,6 +11,7 @@ semantics (``safe_for_retrieval`` gates ``query_corpus``).
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -21,7 +22,7 @@ from ayran.tools.yaml_lite import YamlLiteError, load_yaml
 if TYPE_CHECKING:
     from ayran.knowledge.ingestion import IngestionContext
 
-KRAIT_DEEP_PARSER_VERSION = "krait-deep-1.0.0"
+KRAIT_DEEP_PARSER_VERSION = "krait-deep-1.1.0"
 SUPERSEDED_BY_KEY = "superseded-by:krait-deep"
 
 _CHECK_SPLIT = re.compile(r"^---+\s*$", re.MULTILINE)
@@ -142,6 +143,66 @@ def parse_krait_check_block(text: str) -> dict[str, dict[str, Any]]:
             continue
         key = str(values["canonical_key"])
         records[key] = values
+    return records
+
+
+def parse_krait_framework_checks(text: str) -> dict[str, dict[str, Any]]:
+    """Parse framework-check JSON blobs (``checklist/frameworks/index.json``).
+
+    Each entry of a framework's ``checks`` array becomes one predicate-keyed
+    mechanism record keyed ``krait-deep-<framework>-<check id>``; the upstream
+    question text stays verbatim as the title with the severity prefixed in
+    the summary. Tags, category, and the framework id become applicability
+    predicates. Non-JSON input returns an empty mapping so callers can fall
+    through to the block parser.
+    """
+
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return {}
+    try:
+        data = json.loads(stripped)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    records: dict[str, dict[str, Any]] = {}
+    for framework_id, framework in data.items():
+        if not isinstance(framework, dict) or not isinstance(framework.get("checks"), list):
+            continue
+        prefix = normalize_name(str(framework_id)) or "framework"
+        for check in framework["checks"]:
+            if not isinstance(check, dict):
+                continue
+            check_id = str(check.get("id") or "").strip()
+            question = str(check.get("q") or check.get("name") or "").strip()
+            if not check_id and not question:
+                continue
+            severity = str(check.get("sev") or "").strip().lower()
+            summary = question or f"Krait check {check_id}"
+            if severity:
+                summary = f"[{severity}] {summary}"
+            category = str(check.get("cat") or "").strip()
+            predicates = {f"framework:{prefix}"}
+            tag_pool = [*_as_list(check.get("tags"))]
+            if category:
+                tag_pool.append(category)
+            for tag in tag_pool:
+                slug = normalize_name(str(tag))
+                if slug:
+                    predicates.add(f"pattern:{slug}")
+            key = f"krait-deep-{prefix}-{normalize_name(check_id or question)}"
+            records[key] = {
+                "record_type": "mechanism",
+                "canonical_key": key,
+                "title": question or f"Krait check {check_id}",
+                "summary": summary,
+                "mechanism": category or str(framework.get("label") or prefix),
+                "applicability_predicates": sorted(predicates),
+                "parser_version": KRAIT_DEEP_PARSER_VERSION,
+                "safe_for_execution": False,
+                "safe_for_retrieval": True,
+            }
     return records
 
 
