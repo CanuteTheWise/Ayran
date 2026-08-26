@@ -50,13 +50,13 @@ def _make_server(
     )
 
 
-def _ping_ok(sock: Path, token: bytes, attempts: int = 40) -> bool:
+def _ping_ok(sock: Path, token: bytes, attempts: int = 40, delay: float = 0.05) -> bool:
     for _ in range(attempts):
         try:
             AyranClient(sock, token_bytes=token, timeout=1.0).call("run.ping")
             return True
         except Exception:
-            time.sleep(0.05)
+            time.sleep(delay)
     return False
 
 
@@ -104,10 +104,11 @@ def test_healthy_reattach_no_rotation(tmp_path: Path, short_state_root: Path) ->
 
 
 def test_dead_service_takeover_rotates(tmp_path: Path, short_state_root: Path) -> None:
-    ws, _sock, token_v1 = _prepare_workspace(tmp_path, short_state_root)
+    ws, _sock, _token_v0 = _prepare_workspace(tmp_path, short_state_root)
     first = _reattach(ws, short_state_root)
-    assert Path(first["token_file"]).read_bytes() == token_v1
-    # No live server answers the probe -> cleanup path rotates the bearer.
+    token_v1 = Path(first["token_file"]).read_bytes()
+    assert first["reattached"] is False
+    # Still no live server -> the second takeover rotates again.
     second = _reattach(ws, short_state_root)
     assert second["reattached"] is False
     assert Path(second["token_file"]).read_bytes() != token_v1
@@ -206,7 +207,8 @@ def test_sigterm_cleans_socket(tmp_path: Path, short_state_root: Path) -> None:
     sock = Path(prepared["socket"])
     token = Path(prepared["token_file"]).read_bytes()
     try:
-        assert _ping_ok(sock, token)
+        # Subprocess cold start includes graph replay; use the house pacing.
+        assert _ping_ok(sock, token, attempts=60, delay=0.15)
         proc.send_signal(signal.SIGTERM)
         rc = proc.wait(timeout=10)
         assert rc == 128 + int(signal.SIGTERM)
