@@ -6,7 +6,7 @@
 
 Ayran is a private, local-first autonomous smart-contract security audit harness. It wraps the Prime-Agent CLI with a structured evidence pipeline that turns a configured AI model into a disciplined auditor — one that maps attack surfaces, proposes hypotheses, executes tools to prove or disprove them, enforces validation gates, retains what it learns between audits, and produces defensible reports where every claim resolves to recorded evidence.
 
-The current release is **0.2.0**, now carrying the full Phase-B rebuild on `main`: milestones M0–M9, then R0 truth repair, R1 cognitive inversion, R2 mechanical Gate B, R3 specialists & lenses, R4 corpus ingestion, R5 seamless surface, C3 map enrichment, and R6's live comparative evaluation (not yet re-versioned or tagged). It targets Solidity/EVM contracts on WSL2, runs entirely offline by default, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
+The current release is **0.2.1**, carrying the full Phase-B rebuild on `main` (milestones M0–M9, then R0 truth repair, R1 cognitive inversion, R2 mechanical Gate B, R3 specialists & lenses, R4 corpus ingestion, R5 seamless surface, C3 map enrichment, R6's live comparative evaluation) plus the 0.2.1 sidecar-lifecycle permanent fix: idempotent guard reattach, stale-socket reclaim, silent self-heal on tool calls, honest fail-closed denials, and always-on extension telemetry — proven by five live adversarial drills including concurrent windows and kill-9 recovery. It targets Solidity/EVM contracts on WSL2, runs entirely offline by default, does not send your target code anywhere you did not explicitly allow, and cannot autonomously submit findings externally.
 
 ### How to understand Ayran
 
@@ -235,7 +235,7 @@ If you already have Prime-Agent 0.7.2 in WSL:
 ayran release install --layer --prime /path/to/prime-agent
 ```
 
-Layer installs Ayran into `<prefix>/versions/<version>/` inside WSL (default prefix `~/.local/ayran`, e.g. `~/.local/ayran/versions/0.2.0`), creates a `current` pointer at `<prefix>/current`, and writes a machine-readable receipt to `<prefix>/receipts/<kind>-<version>.json`.
+Layer installs Ayran into `<prefix>/versions/<version>/` inside WSL (default prefix `~/.local/ayran`, e.g. `~/.local/ayran/versions/0.2.1`), creates a `current` pointer at `<prefix>/current`, and writes a machine-readable receipt to `<prefix>/receipts/<kind>-<version>.json`.
 
 ### Option B: Install Complete (clean-slate)
 
@@ -505,6 +505,6 @@ The real boundary is policy at the sidecar layer (deny-wins scope ACL, per-ident
 
 ## License and distribution
 
-Ayran 0.2.0 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
+Ayran 0.2.1 is a **private release**. It is not licensed for public redistribution. The pinned Prime 0.7.2 archive includes its upstream MIT license; third-party notices live under `LICENSES/`.
 
-This is version 0.2.0 carrying the Phase-B rebuild (R0–R6 + C3) on `main`. It is not a certified release and has no public license yet. A live comparative evaluation (A0 vs full-Ayran, five held-out targets, preregistered sheet) was executed on 2026-08-23 under operator-delegated authority: pipeline proven end-to-end, non-inferiority at ceiling, lift not demonstrated — see `docs/evaluation/r6-session-evs_163P3NAAQ7EQQ3K7SWN1J3XXHY/ADJUDICATION.md` for the full honest record.
+This is version 0.2.1: the Phase-B rebuild (R0–R6 + C3) plus the sidecar-lifecycle permanent fix shipped 2026-08-26. It is not a certified release and has no public license yet. A live comparative evaluation (A0 vs full-Ayran, five held-out targets, preregistered sheet) was executed on 2026-08-23 under operator-delegated authority for the Phase-B rebuild: pipeline proven end-to-end, non-inferiority at ceiling, lift not demonstrated — see `docs/evaluation/r6-session-evs_163P3NAAQ7EQQ3K7SWN1J3XXHY/ADJUDICATION.md` for the full honest record. The 0.2.1 lifecycle fix was proven separately by five live adversarial drills (concurrent windows, kill-9 recovery, sloppy-close reattach, stale-socket reclaim) and a live confirmation on a real engagement pin.
