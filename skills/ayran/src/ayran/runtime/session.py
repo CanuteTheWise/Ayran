@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -25,15 +26,28 @@ from ayran.runtime.engagement import (
     write_pin,
 )
 from ayran.runtime.paths import default_state_root, run_root, runtime_root, socket_path
+from ayran.runtime.reattach import probe_socket_healthy
 
 
-def _session_paths(*, cwd: Path, state_root: Path, run_id: str) -> dict[str, Any]:
+def _session_paths(
+    *,
+    cwd: Path,
+    state_root: Path,
+    run_id: str,
+    rotate_token: bool = True,
+) -> dict[str, Any]:
     resolved_cwd = cwd.expanduser().resolve(strict=False)
     resolved_state = state_root.expanduser().resolve(strict=False)
     base = run_root(resolved_state, run_id)
     runtime = runtime_root(resolved_state, run_id)
     runtime.mkdir(parents=True, exist_ok=True)
-    token = create_token(runtime, run_id=run_id)
+    token_path = runtime / f"{run_id}.token"
+    if rotate_token or not token_path.is_file():
+        token = create_token(runtime, run_id=run_id)
+    else:
+        # Idempotent reattach (D1): reuse the existing bearer so a live
+        # sidecar that holds it in memory stays authoritative.
+        token = token_path
     sock = socket_path(resolved_state, run_id)
     return {
         "schema_version": "1.0.0",
@@ -109,8 +123,26 @@ def reattach_session(
         return None
     resolved_state = Path(str(pin["state_root"]))
     require_ext4(resolved_state, allow_unsafe_filesystem=allow_unsafe_filesystem)
-    prepared = _session_paths(cwd=cwd, state_root=resolved_state, run_id=str(pin["run_id"]))
+    run_id = str(pin["run_id"])
+    sock = socket_path(resolved_state, run_id)
+    token_file = runtime_root(resolved_state, run_id) / f"{run_id}.token"
+    healthy = probe_socket_healthy(sock, token_file)
+    prepared = _session_paths(
+        cwd=cwd,
+        state_root=resolved_state,
+        run_id=run_id,
+        rotate_token=not healthy,
+    )
     prepared["resumed"] = True
+    if healthy:
+        # Idempotent reattach: same paths/creds, no rotation, no spawn.
+        prepared["reattached"] = True
+    else:
+        # Takeover path (D1/D3): bury the unreachable predecessor's socket,
+        # but only after the failed health probe above justified it.
+        with contextlib.suppress(OSError):
+            sock.unlink(missing_ok=True)
+        prepared["reattached"] = False
     scope_file = base / "scope.json"
     if scope_file.is_file():
         loaded = load_scope(scope_file)
