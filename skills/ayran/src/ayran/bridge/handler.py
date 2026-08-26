@@ -955,7 +955,8 @@ class BridgeDispatcher:
                 "redaction": {"profile": "default", "secret_scan_passed": True, "redacted": False},
                 "reproduction": {
                     "argv": ["evidence.attach"],
-                    "working_root": str(self.run_root),
+                    # RelativePath contract: anchors are run-root-relative.
+                    "working_root": ".",
                     "environment_hash": ZERO_HASH,
                     "expected_result_hash": digest,
                 },

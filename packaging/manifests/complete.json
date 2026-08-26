@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0.0",
-  "manifest_id": "ayran-complete-0.2.0-private-release-v1",
+  "manifest_id": "ayran-complete-0.2.1-private-release-v1",
   "artifact_kind": "ayran-complete",
   "milestone": "R6-private-release",
-  "ayran_payload": {"manifest": "packaging/manifests/ayran-payload.json", "payload_id": "ayran-release-0.2.0"},
+  "ayran_payload": {"manifest": "packaging/manifests/ayran-payload.json", "payload_id": "ayran-release-0.2.1"},
   "platform": {"lock": "compatibility/platform-lock.json", "supported_runtime": "linux-wsl2", "native_windows": false},
   "prime": {
     "mode": "bundled-unmodified",

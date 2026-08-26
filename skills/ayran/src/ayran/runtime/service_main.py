@@ -38,6 +38,7 @@ def service_main(
     state_root: Path | None,
     socket: Path | None,
     token_file: Path | None,
+    idle_exit_secs: float | None = None,
 ) -> dict[str, Any]:
     resolved_state = state_root or Path(config.state_root)
     base = run_root(resolved_state, run_id)
@@ -114,6 +115,7 @@ def service_main(
         logger=logger,
         handler=handler,
         run_id=run_id,
+        idle_exit_secs=idle_exit_secs,
     )
     dispatcher.shutdown_callback = server.stop
     thread = server.start_background()

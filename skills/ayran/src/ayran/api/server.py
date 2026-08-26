@@ -58,20 +58,48 @@ class AyranServer:
         logger: StructuredLogger,
         handler: Callable[[str, dict[str, Any], PeerCredentials], Any],
         run_id: str,
+        idle_exit_secs: float | None = None,
     ) -> None:
         self.socket_path = socket_path
         self.token = token
         self.logger = logger
         self.handler = handler
         self.run_id = run_id
+        self.idle_exit_secs = idle_exit_secs
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._listen: socket.socket | None = None
         self.expected_uid = getattr(os, "getuid", lambda: os.getpid())()
+        self._conn_lock = threading.Lock()
+        self._active_connections = 0
+        self._last_activity = time.monotonic()
+
+    def _socket_owner_alive(self) -> bool:
+        """Connect-probe an existing socket path; True when something answers.
+
+        ECONNREFUSED/ENOENT (stale file left by SIGKILL or a reboot) answers
+        False; a successful connect means a live server owns the door.
+        """
+
+        try:
+            with socket.socket(getattr(socket, "AF_UNIX", 1), socket.SOCK_STREAM) as probe:
+                probe.settimeout(1.0)
+                probe.connect(str(self.socket_path))
+        except OSError:
+            return False
+        return True
 
     def _bind(self) -> socket.socket:
         if self.socket_path.exists():
-            raise SystemExit(f"socket path already exists: {self.socket_path}")
+            if self._socket_owner_alive():
+                raise SystemExit(
+                    f"refusing to bind {self.socket_path}: a live server owns this socket path"
+                )
+            # Stale reclaim (D2): nothing answered the connect probe, so the
+            # leftover socket file is a landmine from an ungraceful death.
+            self.logger.event("INFO", "service.stale_socket_reclaimed", path_role="service_socket")
+            with contextlib.suppress(OSError):
+                self.socket_path.unlink()
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
         server = socket.socket(getattr(socket, "AF_UNIX", 1), socket.SOCK_STREAM)
         server.bind(str(self.socket_path))
@@ -99,6 +127,15 @@ class AyranServer:
         if not hmac.compare_digest(token.encode("utf-8"), self.token):
             raise PermissionError("run bearer token mismatch")
 
+    def _idle_expired(self) -> bool:
+        if self.idle_exit_secs is None:
+            return False
+        with self._conn_lock:
+            active = self._active_connections
+        if active > 0:
+            return False
+        return (time.monotonic() - self._last_activity) > self.idle_exit_secs
+
     def serve_forever(self) -> None:
         server = self._bind()
         self._listen = server
@@ -108,6 +145,17 @@ class AyranServer:
                 try:
                     connection, _peer_addr = server.accept()
                 except TimeoutError:
+                    # Idle self-retire watchdog: hygiene only — idempotent
+                    # reattach already makes orphans harmless. The default is
+                    # deliberately generous so a long thinking pause mid-hunt
+                    # can never be interrupted.
+                    if self._idle_expired():
+                        self.logger.event(
+                            "INFO",
+                            "service.idle_exit",
+                            idle_seconds=self.idle_exit_secs,
+                        )
+                        break
                     continue
                 except OSError:
                     break
@@ -115,6 +163,8 @@ class AyranServer:
                 thread.start()
         finally:
             server.close()
+            with contextlib.suppress(OSError):
+                self.socket_path.unlink(missing_ok=True)
             self.logger.event("INFO", "service.stopped", run_state="stopped")
 
     def start_background(self) -> threading.Thread:
@@ -129,13 +179,22 @@ class AyranServer:
             with contextlib.suppress(OSError):
                 self._listen.close()
             self._listen = None
-        if self._thread is not None:
+        if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=2)
-            self._thread = None
+        self._thread = None
         with contextlib.suppress(OSError):
             self.socket_path.unlink(missing_ok=True)
 
     def _serve_connection(self, connection: socket.socket) -> None:
+        with self._conn_lock:
+            self._active_connections += 1
+        try:
+            self._serve_connection_locked(connection)
+        finally:
+            with self._conn_lock:
+                self._active_connections -= 1
+
+    def _serve_connection_locked(self, connection: socket.socket) -> None:
         connection.settimeout(5)
         try:
             credentials = self._verify_peer(connection)
@@ -159,6 +218,7 @@ class AyranServer:
 
     def _handle_frame(self, connection: socket.socket, raw: bytes, credentials: PeerCredentials) -> None:
         started = time.monotonic()
+        self._last_activity = started
         request_id: Any = None
         method: str = ""
         try:

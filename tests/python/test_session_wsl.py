@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import sys
 import time
@@ -51,10 +52,8 @@ def test_prepared_service_answers_ping(tmp_path: Path, short_state_root: Path) -
                     client = AyranClient(sock, token_bytes=token)
                     pong = client.call("run.ping")
                     assert pong["run_id"] == prepared["run_id"]
-                    try:
+                    with contextlib.suppress(Exception):
                         client.call("run.shutdown")
-                    except Exception:
-                        pass
                     break
                 except Exception:
                     client = None

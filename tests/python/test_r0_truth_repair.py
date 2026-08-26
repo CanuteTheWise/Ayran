@@ -78,7 +78,7 @@ def test_version_alignment_authored_tree() -> None:
     project = tomllib.loads((manifest_root / "pyproject.toml").read_text(encoding="utf-8"))[
         "project"
     ]
-    assert RELEASE_VERSION == "0.2.0"
+    assert RELEASE_VERSION == "0.2.1"
     assert package["version"] == RELEASE_VERSION
     assert project["version"] == RELEASE_VERSION
     assert locks.versions_align(

@@ -266,7 +266,7 @@ export function registerHooks(
     // read or written. If live verification ever disproves PRE-execution
     // ordering in a current or future Prime version, routed interception is
     // reinstated for bash/write tools only (fail-closed).
-    const decision = (await runtime.sidecar.tryCall("policy.authorize", {
+    let decision = (await runtime.sidecar.tryCall("policy.authorize", {
       tool_name: toolName,
       arguments: input,
     })) as
@@ -276,14 +276,36 @@ export function registerHooks(
         }
       | undefined;
     if (decision === undefined) {
+      // Defect D4 fix, part 2: before denying, attempt ONE silent revival —
+      // a killed guard (drill 3) or a rotated bearer must not paralyze the
+      // session the way night 1 did. Still strictly fail-closed after it.
+      const cwd = runtime.lastSidecarCwd ?? process.cwd();
+      const revived = await ensureSidecar(runtime, cwd);
+      if (revived) {
+        decision = (await runtime.sidecar.tryCall("policy.authorize", {
+          tool_name: toolName,
+          arguments: input,
+        })) as { permitted?: boolean; reason?: string } | undefined;
+      }
+    }
+    if (decision === undefined) {
+      const kind = runtime.sidecar.lastFailure ?? "unreachable";
+      const reasons: Record<string, string> = {
+        unreachable:
+          "Ayran policy sidecar is unreachable; fail closed. This is policy gating, not OS sandboxing.",
+        auth: "Ayran policy sidecar rejected the current bearer after a token rotation; silent revival was attempted and did not recover it; fail closed.",
+        error:
+          "Ayran policy sidecar returned an unexpected error; fail closed. This is policy gating, not OS sandboxing.",
+      };
       runtime.telemetry.event("warn", "ayran.tool.policy_unavailable", {
         outcome: "blocked",
+        failure_kind: kind,
+        revival_attempted: true,
         tool_name_hash: sha256Hex(toolName),
       });
       return {
         block: true,
-        reason:
-          "Ayran policy sidecar is unreachable; fail closed. This is policy gating, not OS sandboxing.",
+        reason: reasons[kind] ?? reasons.unreachable,
       };
     }
     if (!decision.permitted) {

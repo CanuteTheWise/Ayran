@@ -16,10 +16,32 @@ export class SidecarError extends Error {
   }
 }
 
+export type SidecarFailureKind = "unreachable" | "auth" | "error";
+
+function classifyFailure(error: unknown): SidecarFailureKind {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("token mismatch")) {
+    // The guard is alive but holds a different bearer generation than disk.
+    return "auth";
+  }
+  if (
+    message.includes("ENOENT") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("connect") ||
+    message.includes("timed out") ||
+    message.includes("closed")
+  ) {
+    return "unreachable";
+  }
+  return "error";
+}
+
 export class SidecarClient {
   private token: string | undefined;
   private nextId = 1;
   reachable = false;
+  /** Why the last tryCall failed, classified for honest denial messages. */
+  lastFailure: SidecarFailureKind | undefined;
 
   constructor(
     private readonly socketPath: string,
@@ -37,6 +59,25 @@ export class SidecarClient {
   async call(
     method: string,
     params: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    try {
+      return await this.attempt(method, params);
+    } catch (error) {
+      // Defect D4 fix: a rotated bearer used to strand the session until a
+      // full restart. Reload the token file from disk and retry ONCE; the
+      // wire format is untouched.
+      if (!(error instanceof SidecarError) || classifyFailure(error) !== "auth") {
+        throw error;
+      }
+      this.token = undefined;
+      this.loadToken();
+      return await this.attempt(method, params);
+    }
+  }
+
+  private async attempt(
+    method: string,
+    params: Record<string, unknown>,
   ): Promise<unknown> {
     if (!this.socketPath) {
       throw new SidecarError("sidecar socket path is not configured");
@@ -67,6 +108,7 @@ export class SidecarClient {
       );
     }
     this.reachable = true;
+    this.lastFailure = undefined;
     return frame.result;
   }
 
@@ -76,8 +118,9 @@ export class SidecarClient {
   ): Promise<unknown | undefined> {
     try {
       return await this.call(method, params);
-    } catch {
+    } catch (error) {
       this.reachable = false;
+      this.lastFailure = classifyFailure(error);
       return undefined;
     }
   }

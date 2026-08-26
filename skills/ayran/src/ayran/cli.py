@@ -85,6 +85,12 @@ def _parser() -> argparse.ArgumentParser:
     _add_run(service)
     service.add_argument("--socket", type=Path, default=None)
     service.add_argument("--token-file", type=Path, default=None)
+    service.add_argument(
+        "--idle-exit-secs",
+        type=float,
+        default=14400.0,
+        help="exit cleanly after this many idle seconds with no active connections (0 disables)",
+    )
 
     start = sub.add_parser("start", help="prepare a run and auto-bind scope")
     _add_config(start)
@@ -474,10 +480,10 @@ def _command_recover(config, run: str, state_root: Path | None) -> dict[str, Any
     return recover_run(config, run_id=run, state_root=state_root)
 
 
-def _command_service(config, run: str, state_root: Path | None, socket: Path | None, token_file: Path | None) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+def _command_service(config, run: str, state_root: Path | None, socket: Path | None, token_file: Path | None, idle_exit_secs: float | None) -> dict[str, Any]:  # type: ignore[no-untyped-def]
     from ayran.runtime.service_main import service_main
 
-    return service_main(config, run_id=run, state_root=state_root, socket=socket, token_file=token_file)
+    return service_main(config, run_id=run, state_root=state_root, socket=socket, token_file=token_file, idle_exit_secs=idle_exit_secs)
 
 
 def _command_session(config, arguments: argparse.Namespace) -> dict[str, Any]:  # type: ignore[no-untyped-def]
@@ -1104,7 +1110,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif arguments.command == "recover":
             result = _command_recover(config, arguments.run, state_root)
         elif arguments.command == "service":
-            result = _command_service(config, arguments.run, state_root, arguments.socket, arguments.token_file)
+            idle = float(arguments.idle_exit_secs)
+            result = _command_service(
+                config,
+                arguments.run,
+                state_root,
+                arguments.socket,
+                arguments.token_file,
+                idle_exit_secs=idle if idle > 0 else None,
+            )
         elif arguments.command == "start":
             result = _command_start(config, arguments)
         elif arguments.command == "session":
