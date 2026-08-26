@@ -62,6 +62,7 @@ function parsePrepare(stdout: string): {
   state_root: string;
   socket: string;
   token_file: string;
+  reattached?: boolean;
 } {
   const parsed = JSON.parse(stdout) as {
     ok?: boolean;
@@ -70,6 +71,7 @@ function parsePrepare(stdout: string): {
       state_root?: string;
       socket?: string;
       token_file?: string;
+      reattached?: boolean;
     };
   };
   const result = parsed.result;
@@ -87,6 +89,7 @@ function parsePrepare(stdout: string): {
     state_root: result.state_root,
     socket: result.socket,
     token_file: result.token_file,
+    reattached: result.reattached === true,
   };
 }
 
@@ -100,6 +103,7 @@ export async function ensureSidecar(
   if (runtime.sidecar.reachable || runtime.sidecarProcess) {
     return true;
   }
+  runtime.lastSidecarCwd = cwd;
   if (runtime.settings.sidecarSocketPath) {
     const ping = await runtime.sidecar.tryCall("run.ping");
     if (ping !== undefined) {
@@ -136,6 +140,25 @@ export async function ensureSidecar(
     });
     return false;
   }
+  bindSidecar(runtime, paths.socket, paths.token_file, paths.run_id);
+  if (paths.reattached) {
+    // Python reported a healthy guard already owning this run's socket with
+    // the CURRENT token: no rotation happened and no second service may
+    // spawn (it would be refused). Confirm liveness once, then done.
+    const ping = await runtime.sidecar.tryCall("run.ping");
+    if (ping !== undefined) {
+      runtime.telemetry.event("info", "ayran.session.sidecar_reattached", {
+        run_id: paths.run_id,
+      });
+      return true;
+    }
+    runtime.telemetry.event("warn", "ayran.session.reattach_lapsed", {
+      run_id: paths.run_id,
+      outcome: "degraded",
+    });
+    // Fall through: the guard died between prepare and now; the token file
+    // is still authoritative, so a fresh spawn reuses it unchanged.
+  }
   const child: ChildProcess = spawn(
     python,
     [
@@ -155,7 +178,6 @@ export async function ensureSidecar(
   );
   runtime.sidecarProcess = child;
   runtime.spawnedSidecar = true;
-  bindSidecar(runtime, paths.socket, paths.token_file, paths.run_id);
   for (let attempt = 0; attempt < PING_ATTEMPTS; attempt += 1) {
     const ping = await runtime.sidecar.tryCall("run.ping");
     if (ping !== undefined) {

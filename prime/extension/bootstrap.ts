@@ -4,6 +4,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { CredentialMinter } from "./credentials.ts";
@@ -53,6 +54,8 @@ export interface RuntimeState {
   sidecarProcess: ChildProcess | undefined;
   spawnedSidecar: boolean;
   autoStartSidecar: boolean;
+  /** Workspace the session armed from; silent revival reuses it. */
+  lastSidecarCwd: string | undefined;
 }
 
 interface SettingsFile {
@@ -126,14 +129,31 @@ export function loadSettings(cwd: string): AyranSettings {
   };
 }
 
+function defaultStateRoot(): string {
+  // Mirrors ayran.runtime.paths.default_state_root so extension-side evidence
+  // lands in the same XDG-owned tree the Python side uses.
+  const ayranRoot = process.env.AYRAN_STATE_ROOT;
+  if (ayranRoot?.trim()) {
+    return ayranRoot.trim();
+  }
+  const xdg = process.env.XDG_STATE_HOME;
+  if (xdg?.trim()) {
+    return join(xdg.trim(), "ayran");
+  }
+  return join(homedir(), ".local", "state", "ayran");
+}
+
 export function createRuntime(cwd: string): RuntimeState {
   const settings = loadSettings(cwd);
+  // Defect D5 fix: telemetry used to be configured ONLY when a socket path
+  // was pre-set, so the autostart path wrote no extension-side evidence at
+  // all — the night-1 diagnosis required log archaeology without it.
   const logPath = settings.sidecarSocketPath
     ? join(
         dirname(resolve(settings.sidecarSocketPath)),
         "extension-telemetry.jsonl",
       )
-    : undefined;
+    : join(defaultStateRoot(), "extension-telemetry.jsonl");
   const telemetry = new Telemetry(settings.telemetryVerbosity, logPath);
   const sidecar = new SidecarClient(
     settings.sidecarSocketPath,
@@ -155,6 +175,7 @@ export function createRuntime(cwd: string): RuntimeState {
     sidecarProcess: undefined,
     spawnedSidecar: false,
     autoStartSidecar: true,
+    lastSidecarCwd: undefined,
   };
 }
 
