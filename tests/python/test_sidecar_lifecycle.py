@@ -7,6 +7,7 @@ refuse-if-live-server-owns-path, idle-watchdog-exits, SIGTERM-cleans-socket.
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 import sys
@@ -22,6 +23,17 @@ from ayran.runtime.paths import runtime_root
 from ayran.runtime.session import prepare_session, start_engagement
 
 pytestmark = pytest.mark.wsl_ext4
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _child_env() -> dict[str, str]:
+    """Pin spawned services to THIS tree, never the editable-install clone."""
+
+    env = dict(os.environ)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{ROOT}{os.pathsep}{ROOT / 'skills' / 'ayran' / 'src'}{os.pathsep}{existing}"
+    return env
 
 
 def _logger(tmp_path: Path) -> StructuredLogger:
@@ -203,12 +215,20 @@ def test_sigterm_cleans_socket(tmp_path: Path, short_state_root: Path) -> None:
         "--idle-exit-secs",
         "3600",
     ]
-    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=_child_env(),
+    )
     sock = Path(prepared["socket"])
     token = Path(prepared["token_file"]).read_bytes()
     try:
         # Subprocess cold start includes graph replay; use the house pacing.
-        assert _ping_ok(sock, token, attempts=60, delay=0.15)
+        if not _ping_ok(sock, token, attempts=60, delay=0.15):
+            _out, err = proc.communicate(timeout=5)
+            raise AssertionError(f"service never bound; stderr tail: {err[-1200:]}")
         proc.send_signal(signal.SIGTERM)
         rc = proc.wait(timeout=10)
         assert rc == 128 + int(signal.SIGTERM)
