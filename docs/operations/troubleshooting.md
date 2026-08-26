@@ -56,8 +56,14 @@ If it looks empty:
 
 ## Sidecar lifecycle (crash, orphan, manual relaunch)
 
-The sidecar is a plain process: it dies with its parent unless daemonized, and a
-stale socket file does not mean a live service.
+Since Ayran 0.2.1 the sidecar is self-healing: if a guard is killed (crash,
+`kill -9`, reboot), the next tool call silently revives it; a stale socket file
+left by an ungraceful death is reclaimed automatically instead of crashing the
+replacement; and a second `prime-agent --ayran` window shares the same guard
+without rotating credentials. `/quit` remains the polite shutdown, but skipping
+it can no longer paralyze the next session.
+
+The manual path still exists for advanced use:
 
 ```bash
 # Relaunch an existing run in place (same run id, state root, socket, token):
@@ -67,9 +73,9 @@ ayran service --run <run_id> --state-root <state_root> \
 
 All four values come from the original `ayran start` receipt. After relaunch, verify
 with a ping through the authenticated client before trusting it. A stale lease is
-reclaimed by `ayran recover --run <id>`; interactive `/quit` remains the intended
-clean shutdown. A second `prime-agent --print` client can look hung while the owner's
-daemon still holds the worker — do not force-kill the daemon unprompted.
+reclaimed by `ayran recover --run <id>`. A second `prime-agent --print` client can
+look hung while the owner's daemon still holds the worker — do not force-kill the
+daemon unprompted.
 
 ## Evaluation kill switch
 
