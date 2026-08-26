@@ -164,9 +164,11 @@ GATE_B_EXECUTED: dict[str, Any] = {
         ]
     },
     "artifacts": {
-        "poc_source": POC_SOURCE_BYTES,
-        "trace_output": TRACE_OUTPUT_BYTES,
-        "mutated_source": MUTATED_SOURCE_BYTES,
+        # JSON-RPC params must be JSON-serializable; artifact bytes ride the
+        # wire as UTF-8 text (artifact_hashes re-encodes before hashing).
+        "poc_source": POC_SOURCE_BYTES.decode("utf-8"),
+        "trace_output": TRACE_OUTPUT_BYTES.decode("utf-8"),
+        "mutated_source": MUTATED_SOURCE_BYTES.decode("utf-8"),
     },
     "alternate_paths": {"detail": "repeatable; unique trigger is fallback reenter"},
     "feasibility_scope_severity": {"detail": "unprivileged, in-scope, unique"},
