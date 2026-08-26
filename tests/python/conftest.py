@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
@@ -25,10 +26,8 @@ def short_state_root() -> Iterator[Path]:
         yield path
     finally:
         shutil.rmtree(path, ignore_errors=True)
-        try:
+        with contextlib.suppress(OSError):
             base.rmdir()
-        except OSError:
-            pass
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

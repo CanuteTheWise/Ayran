@@ -73,7 +73,12 @@ def _proc_state(pid: int) -> str | None:
 def _windows_pids() -> list[int]:
     import ctypes
 
-    k32 = ctypes.windll.kernel32
+    # POSIX Python builds expose no ctypes.windll; resolve dynamically so the
+    # Linux type-check target never names a Windows-only attribute.
+    windows_tools = getattr(ctypes, "windll", None)
+    if windows_tools is None:
+        return []
+    k32 = windows_tools.kernel32
     snapshot = k32.CreateToolhelp32Snapshot(0x2, 0)
     if snapshot == -1:
         return []

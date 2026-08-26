@@ -12,7 +12,7 @@ from typing import Any
 
 from ayran.graph.canonical import canonical_hash
 from ayran.graph.ids import new_id
-from ayran.policy.scope import _ACTION_ENUM, _normalize_rel, ScopeError
+from ayran.policy.scope import _ACTION_ENUM, ScopeError, _normalize_rel
 
 _HUMAN_CLASSES = (
     "install_tool",
@@ -98,10 +98,7 @@ def detect_local_roots(cwd: Path) -> list[str]:
             if not path.is_file():
                 continue
             parent = path.parent
-            if parent == root:
-                rel_dir = "."
-            else:
-                rel_dir = parent.relative_to(root).as_posix()
+            rel_dir = "." if parent == root else parent.relative_to(root).as_posix()
             top = rel_dir.split("/", 1)[0]
             if top in _SKIP_DIR_NAMES:
                 continue
