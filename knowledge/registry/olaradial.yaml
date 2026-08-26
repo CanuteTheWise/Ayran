@@ -1,7 +1,7 @@
 source_id: olaradial
-display_name: Olaradial duplicate
+display_name: Olaradial duplicate (BLACKLISTED - MALWARE)
 source_type: repository
-origin: https://github.com/example/olaradial
+origin: https://github.com/Olaradiallysymmetrical491/web3-bug-bounty-hunting-ai-skills
 pin:
   commit: ""
   tag: ""
@@ -14,8 +14,8 @@ license:
   retention_constraint: none
 trust_tier: curated_external
 reproduction_status: unverified
-contamination_flags: []
+contamination_flags: ["blacklisted-malware", "malware-dropper", "do-not-clone-do-not-ingest-do-not-execute"]
 contamination_registry: production
 phase: catalogued
 authors: []
-notes: Listed in blueprint section 6. No M7 runtime route. Catalogued or deferred only.
+notes: "PERMANENT BLACKLIST (2026-08-21, firsthand verification): CONFIRMED MALWARE DISTRIBUTION. All 11 SKILL.md files SHA256-identical to shuvonsec/web3-bug-bounty-hunting-ai-skills upstream; fork adds bounty_hunting_bug_ai_skills_web_3.8-beta.5.zip, a Windows dropper (start lua51.exe rest.txt -> obfuscated Lua payload with anti-tamper checks) wrapped in installer-bait README with inflated counts. NEVER clone, ingest, execute, or reintroduce under any current or future name; treat hash-matching content as hostile unless re-verified against canonical shuvonsec upstream. Retained solely as lineage/exclusion record."
